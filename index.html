@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPG Canvas</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-area">
+            <canvas id="gameCanvas"></canvas>
+            <div class="map-position" id="mapPosition">[25, 25]</div>
+        </div>
+        
+        <!-- Mapa completo (oculto por padrão) -->
+        <div class="full-map-container" id="fullMapContainer">
+            <canvas id="fullMapCanvas"></canvas>
+            <div class="map-legend">
+                <div class="legend-item"><span class="legend-color plains"></span> Planície</div>
+                <div class="legend-item"><span class="legend-color forest"></span> Floresta</div>
+                <div class="legend-item"><span class="legend-color mountains"></span> Montanhas</div>
+                <div class="legend-item"><span class="legend-color desert"></span> Deserto</div>
+                <div class="legend-item"><span class="legend-color player"></span> Jogador</div>
+            </div>
+            <div class="map-close-btn" id="closeMapBtn">X</div>
+        </div>
+        
+        <div class="hud">
+            <div class="hud-stats">
+                <div class="level-container">
+                    <div class="level-label">Nível:</div>
+                    <div class="level-value" id="levelValue">1</div>
+                </div>
+                
+                <div class="hp-container">
+                    <div class="hp-label">HP:</div>
+                    <div class="hp-bar-container">
+                        <div class="hp-bar" id="hpBar"></div>
+                    </div>
+                    <div class="hp-value" id="hpValue">100/100</div>
+                </div>
+                
+                <div class="xp-container">
+                    <div class="xp-label">XP:</div>
+                    <div class="xp-bar-container">
+                        <div class="xp-bar" id="xpBar"></div>
+                    </div>
+                    <div class="xp-value" id="xpValue">0/100</div>
+                </div>
+            </div>
+            
+            <div class="hud-skills">
+                <div class="skills-container" id="skillsContainer">
+                    <div class="skill fireball" data-skill="fireball" draggable="false">
+                        <div class="skill-icon">🔥</div>
+                        <div class="cooldown-overlay" id="fireballCooldown"></div>
+                    </div>
+                    <div class="skill empty" data-skill="empty" draggable="false">
+                        <div class="skill-icon">?</div>
+                        <div class="cooldown-overlay"></div>
+                    </div>
+                    <div class="skill empty" data-skill="empty" draggable="false">
+                        <div class="skill-icon">?</div>
+                        <div class="cooldown-overlay"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="js/game.js" type="module"></script>
+</body>
+</html> 
