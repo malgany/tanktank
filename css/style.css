@@ -308,25 +308,7 @@ canvas {
 }
 
 /* Estilos para a lista de poderes */
-.powers-list-container {
-    position: absolute;
-    top: 45%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 80%;
-    max-width: 500px;
-    height: 75%;
-    max-height: 500px;
-    background-color: rgba(0, 0, 0, 0.9);
-    border: 3px solid #444;
-    border-radius: 8px;
-    display: none; /* Oculto por padrão */
-    flex-direction: column;
-    align-items: center;
-    z-index: 200;
-    padding: 20px;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.8);
-}
+/* Removido para evitar duplicação */
 
 .powers-grid {
     display: flex;
@@ -397,4 +379,284 @@ canvas {
 
 .power-item.dragging {
     opacity: 0.5;
+}
+
+/* Estilos para o mapa completo */
+.modal-container {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+.modal-title {
+    color: white;
+    font-size: 24px;
+    margin-bottom: 15px;
+    text-align: center;
+    width: 100%;
+    border-bottom: 1px solid #3498db;
+    padding-bottom: 10px;
+}
+
+.close-btn {
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    z-index: 1001;
+}
+
+/* Estilos específicos para o modal de informações */
+.modal-content {
+    background-color: #222;
+    border-radius: 10px;
+    padding: 20px;
+    width: 400px;
+    max-width: 90%;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    position: relative;
+}
+
+/* Estilos específicos para o modal de mapa */
+.map-content {
+    width: 80%;
+    max-width: 800px;
+    height: 80%;
+    max-height: 600px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#fullMapCanvas {
+    width: 100%;
+    height: calc(100% - 60px);
+    background-color: #222;
+    border: 2px solid #444;
+    border-radius: 5px;
+    margin-top: 10px;
+}
+
+.info-container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #444;
+}
+
+.info-label {
+    font-weight: bold;
+    color: #aaa;
+}
+
+.info-value {
+    color: #fff;
+    font-family: 'Courier New', monospace;
+}
+
+/* Remover estilos duplicados */
+.modal-close-btn {
+    display: none; /* Não usamos mais este estilo */
+}
+
+/* Estilos específicos para o modal de poderes */
+.powers-content {
+    width: 80%;
+    max-width: 500px;
+    height: 75%;
+    max-height: 500px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.powers-grid {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 10px;
+    overflow-y: auto;
+    padding: 10px;
+    margin-top: 10px;
+    max-height: calc(100% - 60px);
+}
+
+.power-item {
+    display: flex;
+    align-items: center;
+    background-color: rgba(52, 152, 219, 0.2);
+    padding: 10px;
+    border-radius: 5px;
+    cursor: grab;
+}
+
+.power-item.disabled {
+    background-color: rgba(100, 100, 100, 0.2);
+    cursor: not-allowed;
+}
+
+.power-icon {
+    width: 40px;
+    height: 40px;
+    background-color: #444;
+    border-radius: 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 20px;
+    margin-right: 15px;
+}
+
+.power-info {
+    flex: 1;
+}
+
+.power-name {
+    font-weight: bold;
+    color: white;
+    margin-bottom: 5px;
+}
+
+.power-description {
+    font-size: 12px;
+    color: #aaa;
+}
+
+.power-item.disabled .power-name {
+    color: #888;
+}
+
+.power-item.disabled .power-description {
+    color: #666;
+}
+
+.power-item.disabled .power-icon {
+    opacity: 0.5;
+}
+
+/* Estilo para quando um item está sendo arrastado */
+.skill.drag-over {
+    border: 2px dashed #3498db;
+}
+
+.power-item.dragging {
+    opacity: 0.5;
+}
+
+/* Remover estilos antigos que não são mais necessários */
+.powers-list-container {
+    display: none; /* Não usamos mais este estilo */
+}
+
+/* Estilos para os poderes */
+.powers-container {
+    display: flex;
+    gap: 10px;
+}
+
+.power {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    background-color: #444;
+    border-radius: 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+.power.selected {
+    border: 2px solid #ffcc00;
+    box-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+}
+
+.power-icon {
+    z-index: 2;
+}
+
+.cooldown-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 5px;
+}
+
+.cooldown {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 0%;
+    background-color: rgba(0, 0, 0, 0.7);
+    transition: height 0.1s linear;
+    z-index: 1;
+}
+
+.power-key {
+    position: absolute;
+    bottom: -5px;
+    right: -5px;
+    width: 16px;
+    height: 16px;
+    background-color: #333;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 10px;
+    color: white;
+    z-index: 3;
+}
+
+/* Estilos específicos para cada poder */
+.fireball-power .power-icon {
+    color: #ff4500;
+}
+
+.aoe-power .power-icon {
+    color: #ff8c00;
+}
+
+.ice-power .power-icon {
+    color: #00ffff;
+}
+
+.ice-power {
+    background-color: #1e3a5f;
+}
+
+/* Efeito de brilho para o poder de gelo */
+@keyframes iceGlow {
+    0% { box-shadow: 0 0 5px rgba(0, 255, 255, 0.3); }
+    50% { box-shadow: 0 0 15px rgba(0, 255, 255, 0.5); }
+    100% { box-shadow: 0 0 5px rgba(0, 255, 255, 0.3); }
+}
+
+.ice-power.selected {
+    border: 2px solid #00ffff;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+    animation: iceGlow 2s infinite;
 } 

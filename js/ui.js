@@ -10,12 +10,44 @@ export class UI {
         this.xpValue = document.getElementById('xpValue');
         this.fireballCooldown = document.getElementById('fireballCooldown');
         
+        // Cria o elemento de cooldown para o poder de gelo
+        this.createIcePowerUI();
+        
         // Sistema de fila de mensagens
         this.messageQueue = [];
         this.isShowingMessage = false;
         
         // Inicializa a UI
         this.update();
+    }
+    
+    // Método para criar a UI do poder de gelo
+    createIcePowerUI() {
+        // Verifica se o elemento já existe
+        if (document.getElementById('iceCooldown')) {
+            return;
+        }
+        
+        // Obtém o container de poderes
+        const powersContainer = document.querySelector('.powers-container');
+        
+        // Cria o elemento do poder de gelo
+        const icePowerElement = document.createElement('div');
+        icePowerElement.className = 'power ice-power';
+        icePowerElement.setAttribute('data-power-id', 'ice');
+        icePowerElement.innerHTML = `
+            <div class="power-icon">❄️</div>
+            <div class="cooldown-bar">
+                <div id="iceCooldown" class="cooldown"></div>
+            </div>
+            <div class="power-key">3</div>
+        `;
+        
+        // Adiciona o elemento ao container
+        powersContainer.appendChild(icePowerElement);
+        
+        // Inicialmente oculto até ser desbloqueado
+        icePowerElement.style.display = 'none';
     }
     
     update() {
@@ -40,9 +72,59 @@ export class UI {
         
         // Atualiza o cooldown do AOE se o elemento existir
         const aoeCooldown = document.getElementById('aoeCooldown');
-        if (aoeCooldown && player.aoeUnlocked) {
+        if (aoeCooldown) {
             const aoeCooldownPercent = (player.aoeCooldown / player.aoeMaxCooldown) * 100;
             aoeCooldown.style.height = `${aoeCooldownPercent}%`;
+            
+            // Mostra o elemento se o poder estiver desbloqueado
+            const aoePower = aoeCooldown.closest('.power');
+            if (aoePower) {
+                aoePower.style.display = player.aoeUnlocked ? 'flex' : 'none';
+            }
+        }
+        
+        // Atualiza o cooldown do poder de gelo se o elemento existir
+        const iceCooldown = document.getElementById('iceCooldown');
+        if (iceCooldown) {
+            const iceCooldownPercent = (player.iceCooldown / player.iceMaxCooldown) * 100;
+            iceCooldown.style.height = `${iceCooldownPercent}%`;
+            
+            // Mostra o elemento se o poder estiver desbloqueado
+            const icePower = iceCooldown.closest('.power');
+            if (icePower) {
+                icePower.style.display = player.hasIcePower ? 'flex' : 'none';
+            }
+        }
+        
+        // Não destaca mais o poder selecionado, pois agora os poderes são usados diretamente
+        // this.highlightSelectedPower(player.selectedPower);
+    }
+    
+    // Método para destacar o poder selecionado
+    highlightSelectedPower(powerId) {
+        // Remove o destaque de todos os poderes
+        const powers = document.querySelectorAll('.power');
+        powers.forEach(power => {
+            power.classList.remove('selected');
+        });
+        
+        // Adiciona o destaque ao poder selecionado
+        let powerElement;
+        
+        switch (powerId) {
+            case 'fireball':
+                powerElement = document.querySelector('.fireball-power');
+                break;
+            case 'aoe':
+                powerElement = document.querySelector('.aoe-power');
+                break;
+            case 'ice':
+                powerElement = document.querySelector('.ice-power');
+                break;
+        }
+        
+        if (powerElement) {
+            powerElement.classList.add('selected');
         }
     }
     

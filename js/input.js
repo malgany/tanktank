@@ -7,7 +7,11 @@ export class InputHandler {
             s: false,
             d: false,
             space: false,
-            shift: false
+            shift: false,
+            // Teclas numéricas para seleção de poderes
+            1: false,
+            2: false,
+            3: false
         };
         
         // Posição do mouse
@@ -40,9 +44,31 @@ export class InputHandler {
             return;
         }
         
+        // Tecla I para mostrar informações do jogador
+        if (event.key.toLowerCase() === 'i') {
+            this.game.togglePlayerInfo();
+            event.preventDefault();
+            return;
+        }
+        
+        // Tecla P para mostrar/ocultar a lista de poderes
+        if (event.key.toLowerCase() === 'p') {
+            this.game.togglePowersList();
+            event.preventDefault();
+            return;
+        }
+        
         // Apenas tecla de debug para mostrar posição atual
         if (event.key === '0') {
             console.log("Posição atual:", window.debugGame.getCurrentPosition());
+            return;
+        }
+        
+        // Teclas numéricas para seleção de poderes
+        if (event.key === '1' || event.key === '2' || event.key === '3') {
+            this.keys[event.key] = true;
+            this.selectPower(parseInt(event.key));
+            event.preventDefault();
             return;
         }
         
@@ -69,7 +95,7 @@ export class InputHandler {
         }
         
         // Evita o comportamento padrão para as teclas do jogo
-        if (['w', 'a', 's', 'd', ' ', 'shift', 'm', '0'].includes(event.key.toLowerCase())) {
+        if (['w', 'a', 's', 'd', ' ', 'shift', 'm', 'i', 'p', '0', '1', '2', '3'].includes(event.key.toLowerCase())) {
             event.preventDefault();
         }
     }
@@ -95,6 +121,39 @@ export class InputHandler {
             case 'shift':
                 this.keys.shift = false;
                 break;
+            case '1':
+            case '2':
+            case '3':
+                this.keys[event.key] = false;
+                break;
+        }
+    }
+    
+    // Método para selecionar um poder com base na tecla numérica
+    selectPower(keyNumber) {
+        const player = this.game.player;
+        
+        switch (keyNumber) {
+            case 1:
+                player.selectedPower = 'fireball';
+                this.game.ui.showMessage("Poder selecionado: Bola de Fogo", 1500);
+                break;
+            case 2:
+                if (player.aoeUnlocked) {
+                    player.selectedPower = 'aoe';
+                    this.game.ui.showMessage("Poder selecionado: Explosão", 1500);
+                } else {
+                    this.game.ui.showMessage("Poder de Explosão ainda não desbloqueado!", 1500);
+                }
+                break;
+            case 3:
+                if (player.hasIcePower) {
+                    player.selectedPower = 'ice';
+                    this.game.ui.showMessage("Poder selecionado: Gelo", 1500);
+                } else {
+                    this.game.ui.showMessage("Poder de Gelo ainda não desbloqueado!", 1500);
+                }
+                break;
         }
     }
     
@@ -112,6 +171,31 @@ export class InputHandler {
         // Verifica se é o botão esquerdo (0)
         if (event.button === 0) {
             this.mouseDown = true;
+            
+            // Seleciona o poder com base nas teclas modificadoras
+            if (event.ctrlKey) {
+                // CTRL + clique = Poder 3 (Gelo)
+                if (this.game.player.hasIcePower) {
+                    this.game.player.selectedPower = 'ice';
+                    this.game.player.usePower();
+                    this.game.ui.showMessage("Usando: Gelo", 1000);
+                } else {
+                    this.game.ui.showMessage("Poder de Gelo ainda não desbloqueado!", 1500);
+                }
+            } else if (event.shiftKey) {
+                // SHIFT + clique = Poder 2 (AOE)
+                if (this.game.player.aoeUnlocked) {
+                    this.game.player.selectedPower = 'aoe';
+                    this.game.player.usePower();
+                    this.game.ui.showMessage("Usando: Explosão", 1000);
+                } else {
+                    this.game.ui.showMessage("Poder de Explosão ainda não desbloqueado!", 1500);
+                }
+            } else {
+                // Clique normal = Poder 1 (Bola de Fogo)
+                this.game.player.selectedPower = 'fireball';
+                this.game.player.usePower();
+            }
         }
     }
     
@@ -161,15 +245,8 @@ export class InputHandler {
         // Atualiza o movimento do jogador
         this.game.player.setMovement(moveX, moveY);
         
-        // Processa o ataque com o mouse
-        if (this.mouseDown) {
-            // Se Shift estiver pressionado e o jogador tiver nível 5+, usa o AOE
-            if (this.keys.shift && this.game.player.level >= 5) {
-                this.game.player.fireAOE();
-            } else {
-                this.game.player.fireProjectile();
-            }
-        }
+        // Não processa mais o ataque com o mouse aqui
+        // O ataque agora é processado apenas no evento mousedown
         
         // Mantém a tecla de espaço para compatibilidade, mas não dispara mais
         if (this.keys.space) {

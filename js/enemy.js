@@ -1,5 +1,7 @@
+import { EnemyProjectile } from './projectile.js';
+
 export class Enemy {
-    constructor(x, y, health, damage, xpValue, type = null, zone = 0) {
+    constructor(x, y, health, damage, xpValue, type = null, zone = 0, game = null) {
         this.x = x;
         this.y = y;
         this.width = 30;
@@ -9,12 +11,14 @@ export class Enemy {
         this.damage = damage;
         this.xpValue = xpValue;
         this.zone = zone;
+        this.game = game;
         
         // Tipo de inimigo: 'broken', 'random', 'pursuer'
         this.type = type || this.determineType(zone);
         
         // Movimento
         this.speed = 1 + Math.random() * 1.5; // Velocidade aleatória
+        this.originalSpeed = this.speed; // Armazena a velocidade original para efeitos de lentidão
         this.moveTimer = 0;
         this.moveInterval = 1000 + Math.random() * 2000; // Intervalo de movimento aleatório
         this.moveDirection = Math.random() * Math.PI * 2; // Direção aleatória
@@ -22,6 +26,7 @@ export class Enemy {
         // Ajusta velocidade e intervalo com base no tipo
         if (this.type === 'pursuer') {
             this.speed *= 1.2; // Perseguidores são mais rápidos
+            this.originalSpeed = this.speed; // Atualiza a velocidade original
         } else if (this.type === 'random') {
             this.moveInterval *= 0.8; // Aleatórios mudam de direção mais frequentemente
         }
@@ -55,6 +60,15 @@ export class Enemy {
         this.knockbackY = 0;
         this.knockbackDuration = 0;
         this.dead = false; // Flag para indicar se o inimigo está morto
+        this.visible = true; // Adiciona a flag de visibilidade
+        
+        // Efeitos de status
+        this.isSlowed = false; // Se está sob efeito de lentidão
+        this.isFrozen = false; // Se está congelado
+        this.iceParticles = []; // Partículas de gelo para efeito visual
+        
+        // ID único para o inimigo (para rastreamento de efeitos)
+        this.id = Math.random().toString(36).substr(2, 9);
     }
     
     determineType(zone) {
@@ -102,8 +116,8 @@ export class Enemy {
         // Cria partículas de fumaça para inimigos quebrados
         for (let i = 0; i < 5; i++) {
             this.smokeParticles.push({
-                x: Math.random() * 10 - 5, // Posição inicial aleatória em torno do centro
-                y: Math.random() * 10 - 5,
+                x: this.x + this.width/2 + Math.random() * 10 - 5, // Posição inicial relativa ao inimigo
+                y: this.y + this.height/2 + Math.random() * 10 - 5,
                 size: 3 + Math.random() * 5,
                 speed: 0.2 + Math.random() * 0.3,
                 angle: Math.random() * Math.PI * 2,
@@ -151,8 +165,24 @@ export class Enemy {
     }
     
     update(deltaTime, player, game) {
-        // Se o inimigo estiver morto, não faz nada
-        if (this.dead) return;
+        // Se o inimigo estiver morto ou invisível, não atualiza nada
+        if (this.dead || !this.visible) {
+            // Adiciona log para debug
+            if (this.dead) {
+                console.log("Tentando atualizar inimigo morto:", this);
+            }
+            return;
+        }
+        
+        // Atualiza a referência ao jogo se não tivermos uma
+        if (!this.game && game) {
+            this.game = game;
+        }
+        
+        // Atualiza as partículas de fumaça para inimigos quebrados
+        if (this.type === 'broken') {
+            this.updateSmokeParticles(deltaTime);
+        }
         
         // Atualiza o timer de movimento
         this.moveTimer += deltaTime;
@@ -183,11 +213,6 @@ export class Enemy {
             this.rotation = this.moveDirection; // Tanque aponta na direção do movimento
         }
         
-        // Atualiza as partículas de fumaça para inimigos quebrados
-        if (this.type === 'broken') {
-            this.updateSmokeParticles(deltaTime);
-        }
-        
         // Verifica se deve atirar no jogador
         if (this.type !== 'broken' && this.shootCooldown <= 0) {
             const dx = player.x + player.width/2 - (this.x + this.width/2);
@@ -202,29 +227,36 @@ export class Enemy {
                 // Calcula a direção para o jogador
                 const angle = Math.atan2(dy, dx);
                 
+                // Atualiza a rotação do tanque para apontar para o jogador quando atira
+                this.rotation = angle;
+                
                 // Cria um projétil inimigo
                 if (game) {
                     const projectileSpeed = 3;
-                    const projectile = {
-                        x: this.x + this.width/2,
-                        y: this.y + this.height/2,
-                        width: 8,
-                        height: 8,
-                        speedX: Math.cos(angle) * projectileSpeed,
-                        speedY: Math.sin(angle) * projectileSpeed,
-                        damage: this.damage,
-                        isEnemy: true,
-                        lifespan: 2000,
-                        color: this.color
-                    };
                     
-                    game.projectiles.push(projectile);
+                    // Criar um projétil válido usando a classe Projectile
+                    const enemyProjectile = new EnemyProjectile(
+                        this.x + this.width/2,
+                        this.y + this.height/2,
+                        8,
+                        8,
+                        Math.cos(angle) * projectileSpeed,
+                        Math.sin(angle) * projectileSpeed,
+                        this.damage,
+                        this.color
+                    );
+                    
+                    // Adicionar o projétil usando o método addProjectile
+                    game.addProjectile(enemyProjectile);
                 }
                 
                 // Reseta o cooldown
                 this.shootCooldown = this.shootMaxCooldown;
             }
         }
+        
+        // Atualiza os efeitos visuais de gelo
+        this.updateIceEffects(deltaTime);
     }
     
     updateSmokeParticles(deltaTime) {
@@ -295,8 +327,31 @@ export class Enemy {
     }
     
     draw(ctx) {
-        // Se o inimigo estiver morto, não desenha
-        if (this.dead) return;
+        // Se o inimigo estiver morto ou invisível, não desenha nada
+        if (this.dead || !this.visible) {
+            // Adiciona log para debug
+            if (this.dead && (this.x > 0 || this.y > 0)) {
+                console.log("Tentando desenhar inimigo morto:", this);
+            }
+            return; // Sai imediatamente sem desenhar nada
+        }
+        
+        // Verifica se as coordenadas são válidas
+        if (isNaN(this.x) || isNaN(this.y)) {
+            console.log("Inimigo com coordenadas NaN:", this);
+            // Corrige as coordenadas para evitar problemas
+            this.x = 0;
+            this.y = 0;
+            this.dead = true;
+            this.visible = false;
+            return;
+        }
+        
+        // Verifica se as coordenadas são válidas (não está no canto superior esquerdo)
+        if (this.x < -100 || this.y < -100) {
+            console.log("Inimigo fora da tela:", this);
+            return; // Não desenha inimigos fora da tela
+        }
         
         const centerX = this.x + this.width / 2;
         const centerY = this.y + this.height / 2;
@@ -306,13 +361,35 @@ export class Enemy {
         const pulseFactor = 1 + Math.sin(time * this.pulseRate + this.pulseOffset) * this.pulseAmount;
         
         // Define a cor com base no estado de dano
-        const baseColor = this.damageFlash > 0 ? '#ffffff' : this.color;
+        let baseColor = this.damageFlash > 0 ? '#ffffff' : this.color;
+        
+        // Modifica a cor se estiver congelado ou lento
+        if (this.isFrozen) {
+            baseColor = '#96D9FF'; // Azul claro para congelado
+        } else if (this.isSlowed) {
+            // Mistura a cor original com azul claro para efeito de lentidão
+            const originalColor = this.damageFlash > 0 ? '#ffffff' : this.color;
+            baseColor = this.blendColors(originalColor, '#96D9FF', 0.3);
+        }
         
         // Salva o contexto para aplicar transformações
         ctx.save();
         ctx.translate(centerX, centerY);
+        
+        // Aplica tremor se estiver congelado
+        if (this.isFrozen) {
+            const shakeAmount = 0.5;
+            ctx.translate(
+                (Math.random() - 0.5) * shakeAmount,
+                (Math.random() - 0.5) * shakeAmount
+            );
+        }
+        
         ctx.rotate(this.rotation);
         ctx.scale(pulseFactor, pulseFactor);
+        
+        // Desenha os efeitos de gelo (atrás do tanque)
+        this.drawIceEffects(ctx);
         
         // Desenha o tanque
         this.drawTank(ctx, baseColor);
@@ -350,7 +427,7 @@ export class Enemy {
         ctx.arc(0, 0, towerSize / 3, 0, Math.PI * 2);
         ctx.fill();
         
-        // Canhão do tanque
+        // Canhão do tanque - Corrigido para evitar desenhar dois canhões
         ctx.strokeStyle = '#333';
         ctx.lineWidth = 3;
         ctx.beginPath();
@@ -383,6 +460,11 @@ export class Enemy {
     }
     
     drawSmokeParticles(ctx) {
+        // Se o inimigo estiver morto ou invisível, não desenha nada
+        if (this.dead || !this.visible || this.smokeParticles.length === 0) {
+            return;
+        }
+        
         for (const particle of this.smokeParticles) {
             ctx.save();
             ctx.globalAlpha = particle.opacity;
@@ -439,18 +521,237 @@ export class Enemy {
     
     takeDamage(amount) {
         this.health -= amount;
-        this.damageFlash = 100; // 100ms de flash
+        this.damageFlash = 0.5; // Efeito visual de dano
         
-        // Garante que a saúde não fique negativa
         if (this.health <= 0) {
-            this.health = 0;
-            this.dead = true; // Marca o inimigo como morto
+            // Gera drop antes de marcar como morto
+            this.generateDrop();
+            
+            // Log para debug
+            console.log(`Inimigo com ${this.xpValue} XP derrotado!`);
+            
+            // Se tivermos referência ao game, dá XP ao jogador
+            if (this.game && this.game.player) {
+                // Dá XP ao jogador
+                this.game.player.gainXP(this.xpValue);
+                
+                // Verifica se todos os inimigos foram eliminados
+                // Não precisamos verificar o índice, pois o array será filtrado no próximo frame
+                if (this.game.enemies.filter(e => !e.dead && e.visible).length <= 1) {
+                    this.game.markScreenAsCleared();
+                    console.log("Tela limpa de inimigos!");
+                }
+            } else {
+                console.warn('Inimigo derrotado mas sem referência ao jogo ou jogador!');
+            }
+            
+            // Completamente destrói o inimigo
+            this.dead = true;
+            this.visible = false;
+            this.smokeParticles = [];
+            
+            // Retorna true para indicar que o inimigo foi destruído
+            return true;
+        }
+        
+        return false; // Inimigo ainda vivo
+    }
+    
+    generateDrop() {
+        // 30% de chance de gerar um drop
+        if (Math.random() < 0.3) {
+            // Determina o tipo de drop
+            const dropType = Math.random() < 0.33 ? 'speed' : 
+                             Math.random() < 0.66 ? 'damage' : 'health';
+            
+            // Cria o objeto de drop
+            const drop = {
+                x: this.x + this.width / 2,
+                y: this.y + this.height / 2,
+                width: 15,
+                height: 15,
+                type: dropType,
+                value: dropType === 'health' ? 10 : 0.5,
+                collected: false
+            };
+            
+            // Adiciona o drop ao jogo
+            if (this.game) {
+                this.game.addDrop(drop);
+            }
         }
     }
     
     applyKnockback(directionX, directionY, force) {
+        // Verifica se os parâmetros são números válidos
+        if (isNaN(directionX) || isNaN(directionY) || isNaN(force)) {
+            console.log("Tentativa de aplicar knockback com valores NaN:", {
+                directionX, directionY, force, enemy: this
+            });
+            return; // Não aplica knockback com valores inválidos
+        }
+        
+        // Normaliza a direção para evitar knockbacks extremos
+        const length = Math.sqrt(directionX * directionX + directionY * directionY);
+        if (length > 0) {
+            directionX = directionX / length;
+            directionY = directionY / length;
+        } else {
+            // Se não houver direção, usa uma direção padrão
+            directionX = 0;
+            directionY = -1; // Para cima
+        }
+        
         this.knockbackX = directionX * force;
         this.knockbackY = directionY * force;
         this.knockbackDuration = 100; // 100ms de knockback
+    }
+    
+    // Método para atualizar os efeitos visuais de gelo
+    updateIceEffects(deltaTime) {
+        // Atualiza as partículas de gelo existentes
+        for (let i = this.iceParticles.length - 1; i >= 0; i--) {
+            const particle = this.iceParticles[i];
+            
+            // Reduz o tempo de vida
+            particle.life -= deltaTime;
+            
+            // Remove partículas expiradas
+            if (particle.life <= 0) {
+                this.iceParticles.splice(i, 1);
+            }
+        }
+        
+        // Adiciona novas partículas de gelo se estiver congelado ou lento
+        if (this.isFrozen || this.isSlowed) {
+            // Adiciona menos partículas se estiver apenas lento
+            const particleChance = this.isFrozen ? 0.3 : 0.1;
+            
+            if (Math.random() < particleChance) {
+                this.addIceParticle();
+            }
+        }
+    }
+    
+    // Método para adicionar uma partícula de gelo
+    addIceParticle() {
+        const centerX = this.x + this.width / 2;
+        const centerY = this.y + this.height / 2;
+        
+        this.iceParticles.push({
+            x: centerX + (Math.random() - 0.5) * this.width,
+            y: centerY + (Math.random() - 0.5) * this.height,
+            size: 1 + Math.random() * 3,
+            vx: (Math.random() - 0.5) * 0.5,
+            vy: (Math.random() - 0.5) * 0.5 - 0.2, // Tendência a subir
+            life: 500 + Math.random() * 1000,
+            alpha: 0.7 + Math.random() * 0.3
+        });
+    }
+    
+    // Método para desenhar as partículas de gelo
+    drawIceEffects(ctx) {
+        // Não desenha se não houver efeitos
+        if (!this.isSlowed && !this.isFrozen && this.iceParticles.length === 0) {
+            return;
+        }
+        
+        // Desenha um efeito de aura de gelo se estiver congelado
+        if (this.isFrozen) {
+            ctx.save();
+            
+            // Cria um gradiente radial para a aura de gelo
+            const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(this.width, this.height) * 0.7);
+            gradient.addColorStop(0, 'rgba(150, 217, 255, 0.6)');
+            gradient.addColorStop(1, 'rgba(150, 217, 255, 0)');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(0, 0, Math.max(this.width, this.height) * 0.7, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Desenha cristais de gelo
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.lineWidth = 1;
+            
+            for (let i = 0; i < 8; i++) {
+                const angle = (i / 8) * Math.PI * 2;
+                const length = Math.max(this.width, this.height) * 0.5;
+                
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(Math.cos(angle) * length, Math.sin(angle) * length);
+                ctx.stroke();
+                
+                // Desenha pequenos cristais nas pontas
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(angle) * length * 0.7, Math.sin(angle) * length * 0.7);
+                ctx.lineTo(Math.cos(angle + 0.2) * length * 0.9, Math.sin(angle + 0.2) * length * 0.9);
+                ctx.stroke();
+                
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(angle) * length * 0.7, Math.sin(angle) * length * 0.7);
+                ctx.lineTo(Math.cos(angle - 0.2) * length * 0.9, Math.sin(angle - 0.2) * length * 0.9);
+                ctx.stroke();
+            }
+            
+            ctx.restore();
+        }
+        // Desenha um efeito de aura de lentidão se estiver apenas lento
+        else if (this.isSlowed) {
+            ctx.save();
+            
+            // Cria um gradiente radial para a aura de lentidão
+            const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(this.width, this.height) * 0.6);
+            gradient.addColorStop(0, 'rgba(150, 217, 255, 0.3)');
+            gradient.addColorStop(1, 'rgba(150, 217, 255, 0)');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(0, 0, Math.max(this.width, this.height) * 0.6, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+        
+        // Desenha as partículas de gelo
+        ctx.save();
+        
+        for (const particle of this.iceParticles) {
+            const relativeX = particle.x - (this.x + this.width / 2);
+            const relativeY = particle.y - (this.y + this.height / 2);
+            
+            ctx.fillStyle = `rgba(200, 240, 255, ${particle.alpha * (particle.life / 1500)})`;
+            ctx.beginPath();
+            ctx.arc(relativeX, relativeY, particle.size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        ctx.restore();
+    }
+    
+    // Método para misturar duas cores
+    blendColors(color1, color2, ratio) {
+        // Converte cores para RGB
+        const parseColor = (color) => {
+            if (color.startsWith('#')) {
+                const r = parseInt(color.substr(1, 2), 16);
+                const g = parseInt(color.substr(3, 2), 16);
+                const b = parseInt(color.substr(5, 2), 16);
+                return [r, g, b];
+            }
+            return [0, 0, 0]; // Fallback para preto
+        };
+        
+        const [r1, g1, b1] = parseColor(color1);
+        const [r2, g2, b2] = parseColor(color2);
+        
+        // Mistura as cores
+        const r = Math.round(r1 * (1 - ratio) + r2 * ratio);
+        const g = Math.round(g1 * (1 - ratio) + g2 * ratio);
+        const b = Math.round(b1 * (1 - ratio) + b2 * ratio);
+        
+        // Converte de volta para hex
+        return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
     }
 } 

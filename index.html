@@ -14,16 +14,46 @@
         </div>
         
         <!-- Mapa completo (oculto por padrão) -->
-        <div class="full-map-container" id="fullMapContainer">
-            <canvas id="fullMapCanvas"></canvas>
-            <div class="map-legend">
-                <div class="legend-item"><span class="legend-color plains"></span> Planície</div>
-                <div class="legend-item"><span class="legend-color forest"></span> Floresta</div>
-                <div class="legend-item"><span class="legend-color mountains"></span> Montanhas</div>
-                <div class="legend-item"><span class="legend-color desert"></span> Deserto</div>
-                <div class="legend-item"><span class="legend-color player"></span> Jogador</div>
+        <div id="fullMapContainer" class="modal-container">
+            <div class="modal-content map-content">
+                <button id="closeMapBtn" class="close-btn">X</button>
+                <h2 class="modal-title">Mapa do Mundo</h2>
+                <canvas id="fullMapCanvas"></canvas>
             </div>
-            <div class="map-close-btn" id="closeMapBtn">X</div>
+        </div>
+        
+        <!-- Modal de Informações do Jogador -->
+        <div id="playerInfoModal" class="modal-container">
+            <div class="modal-content">
+                <button id="closeInfoBtn" class="close-btn">X</button>
+                <h2 class="modal-title">Informações do Jogador</h2>
+                <div class="info-container">
+                    <div class="info-row">
+                        <span class="info-label">Nível:</span>
+                        <span id="infoLevel" class="info-value">1</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Vida:</span>
+                        <span id="infoHealth" class="info-value">100/100</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Experiência:</span>
+                        <span id="infoXP" class="info-value">0/100</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Dano do Projétil:</span>
+                        <span id="infoDamage" class="info-value">20</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Velocidade:</span>
+                        <span id="infoSpeed" class="info-value">5.0</span>
+                    </div>
+                    <div class="info-row" id="aoeInfoRow">
+                        <span class="info-label">Dano em Área:</span>
+                        <span id="infoAOEDamage" class="info-value">40</span>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <div class="hud">
@@ -51,23 +81,27 @@
             </div>
             
             <div class="hud-skills">
-                <div class="skills-container" id="skillsContainer">
-                    <div class="skill fireball" data-skill="fireball" draggable="false">
-                        <div class="skill-icon">🔥</div>
-                        <div class="cooldown-overlay" id="fireballCooldown"></div>
+                <!-- Container de poderes -->
+                <div class="powers-container">
+                    <div class="power fireball-power selected" data-power-id="fireball">
+                        <div class="power-icon">🔥</div>
+                        <div class="cooldown-bar">
+                            <div id="fireballCooldown" class="cooldown"></div>
+                        </div>
+                        <div class="power-key">1</div>
                     </div>
-                    <div class="skill empty" data-skill="empty" draggable="false">
-                        <div class="skill-icon">?</div>
-                        <div class="cooldown-overlay"></div>
+                    <div class="power aoe-power" style="display: none;" data-power-id="aoe">
+                        <div class="power-icon">💥</div>
+                        <div class="cooldown-bar">
+                            <div id="aoeCooldown" class="cooldown"></div>
+                        </div>
+                        <div class="power-key">2</div>
                     </div>
-                    <div class="skill empty" data-skill="empty" draggable="false">
-                        <div class="skill-icon">?</div>
-                        <div class="cooldown-overlay"></div>
-                    </div>
+                    <!-- O poder de gelo será adicionado dinamicamente pelo JS -->
                 </div>
             </div>
         </div>
     </div>
-    <script src="js/game.js" type="module"></script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html> 

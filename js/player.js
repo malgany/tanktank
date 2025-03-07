@@ -1,5 +1,6 @@
 import { Projectile } from './projectile.js';
 import { AOEEffect } from './aoe.js';
+import { IceProjectile } from './chest.js';
 
 export class Player {
     constructor(game) {
@@ -12,7 +13,7 @@ export class Player {
         this.y = game.canvas.height / 2 - this.height / 2;
         
         // Movimento
-        this.speed = 5;
+        this.speed = 2;
         this.moveX = 0;
         this.moveY = 0;
         
@@ -23,11 +24,11 @@ export class Player {
         this.invulnerableTime = 0;
         
         // Atributos
-        this.maxHealth = 100;
+        this.maxHealth = 50;
         this.health = this.maxHealth;
         this.level = 1;
         this.xp = 0;
-        this.xpToNextLevel = 100;
+        this.xpToNextLevel = 50;
         
         // Habilidades
         this.fireballDamage = 20;
@@ -50,6 +51,38 @@ export class Player {
         this.trackMarks = [];
         this.lastTrackTime = 0;
         this.trackInterval = 100; // Intervalo para criar novas marcas (ms)
+        
+        // Novos poderes e melhorias
+        this.powerMultiplier = 1; // Multiplicador de poderes (item +1)
+        this.hasRicochet = false; // Se tem a habilidade de ricochete
+        this.hasIcePower = false; // Se tem o poder de gelo
+        this.iceCooldown = 0;
+        this.iceMaxCooldown = 2000; // 2 segundos
+        
+        // Sistema de congelamento de inimigos
+        this.frozenEnemies = {}; // Armazena os inimigos congelados e seus tempos
+        
+        // Lista de poderes disponíveis
+        this.powers = [
+            {
+                id: 'fireball',
+                name: 'Bola de Fogo',
+                description: 'Dispara uma bola de fogo na direção do cursor',
+                cooldown: 0,
+                maxCooldown: this.fireballMaxCooldown
+            },
+            {
+                id: 'aoe',
+                name: 'Explosão',
+                description: 'Cria uma explosão que causa dano em área',
+                cooldown: 0,
+                maxCooldown: this.aoeMaxCooldown,
+                unlocked: this.aoeUnlocked
+            }
+        ];
+        
+        // Poder selecionado atualmente
+        this.selectedPower = 'fireball';
     }
     
     update(deltaTime) {
@@ -110,7 +143,8 @@ export class Player {
             if (this.fireballCooldown < 0) this.fireballCooldown = 0;
             
             // Atualiza a UI do cooldown
-            document.getElementById('fireballCooldown').style.height = `${(this.fireballCooldown / this.fireballMaxCooldown) * 100}%`;
+            const cooldownPercent = (this.fireballCooldown / this.fireballMaxCooldown) * 100;
+            document.getElementById('fireballCooldown').style.height = `${cooldownPercent}%`;
         }
         
         if (this.aoeCooldown > 0) {
@@ -120,7 +154,20 @@ export class Player {
             // Atualiza a UI do cooldown
             const aoeCooldown = document.getElementById('aoeCooldown');
             if (aoeCooldown) {
-                aoeCooldown.style.height = `${(this.aoeCooldown / this.aoeMaxCooldown) * 100}%`;
+                const cooldownPercent = (this.aoeCooldown / this.aoeMaxCooldown) * 100;
+                aoeCooldown.style.height = `${cooldownPercent}%`;
+            }
+        }
+        
+        if (this.iceCooldown > 0) {
+            this.iceCooldown -= deltaTime;
+            if (this.iceCooldown < 0) this.iceCooldown = 0;
+            
+            // Atualiza a UI do cooldown
+            const iceCooldown = document.getElementById('iceCooldown');
+            if (iceCooldown) {
+                const cooldownPercent = (this.iceCooldown / this.iceMaxCooldown) * 100;
+                iceCooldown.style.height = `${cooldownPercent}%`;
             }
         }
         
@@ -133,6 +180,9 @@ export class Player {
                 this.trackMarks.splice(i, 1);
             }
         }
+        
+        // Atualiza o estado dos inimigos congelados
+        this.updateFrozenEnemies();
     }
     
     createTrackMarks() {
@@ -273,17 +323,34 @@ export class Player {
         const x = centerX + Math.cos(this.angle) * distance - 5; // -5 para centralizar o projétil
         const y = centerY + Math.sin(this.angle) * distance - 5; // -5 para centralizar o projétil
         
-        const projectile = new Projectile(
-            x, 
-            y, 
-            10, 
-            10, 
-            velocityX, 
-            velocityY, 
-            this.fireballDamage
-        );
+        // Cria múltiplos projéteis com base no multiplicador de poder
+        for (let i = 0; i < this.powerMultiplier; i++) {
+            // Pequeno desvio para cada projétil adicional
+            const angleOffset = i === 0 ? 0 : (Math.random() * 0.2 - 0.1);
+            const adjustedVelocityX = Math.cos(this.angle + angleOffset) * speed;
+            const adjustedVelocityY = Math.sin(this.angle + angleOffset) * speed;
+            
+            // Pequeno atraso para cada projétil adicional
+            setTimeout(() => {
+                const projectile = new Projectile(
+                    x, 
+                    y, 
+                    10, 
+                    10, 
+                    adjustedVelocityX, 
+                    adjustedVelocityY, 
+                    this.fireballDamage
+                );
+                
+                // Aplica ricochete se o jogador tiver a habilidade
+                if (this.hasRicochet) {
+                    projectile.canRicochet = true;
+                }
+                
+                this.game.addProjectile(projectile);
+            }, i * 100); // 100ms de atraso entre cada projétil
+        }
         
-        this.game.addProjectile(projectile);
         this.fireballCooldown = this.fireballMaxCooldown;
         
         // Atualiza a UI do cooldown
@@ -297,26 +364,87 @@ export class Player {
         const centerX = this.x + this.width / 2;
         const centerY = this.y + this.height / 2;
         
-        // Posição do AOE (a uma distância fixa na direção do mouse)
-        const distance = 80; // Distância do centro do jogador
-        const x = centerX + Math.cos(this.angle) * distance;
-        const y = centerY + Math.sin(this.angle) * distance;
+        // Cria múltiplos AOEs com base no multiplicador de poder
+        for (let i = 0; i < this.powerMultiplier; i++) {
+            // Posição do AOE (a uma distância fixa na direção do mouse)
+            const distance = 80 + (i * 20); // Distância aumenta para cada AOE adicional
+            const x = centerX + Math.cos(this.angle) * distance;
+            const y = centerY + Math.sin(this.angle) * distance;
+            
+            // Pequeno atraso para cada AOE adicional
+            setTimeout(() => {
+                const aoe = new AOEEffect(
+                    x, 
+                    y, 
+                    80, // raio
+                    this.aoeDamage,
+                    500 // duração em ms
+                );
+                
+                this.game.addAOEEffect(aoe);
+            }, i * 200); // 200ms de atraso entre cada AOE
+        }
         
-        const aoe = new AOEEffect(
-            x, 
-            y, 
-            80, // raio
-            this.aoeDamage,
-            500 // duração em ms
-        );
-        
-        this.game.addAOEEffect(aoe);
         this.aoeCooldown = this.aoeMaxCooldown;
         
         // Atualiza a UI do cooldown
         const aoeCooldown = document.getElementById('aoeCooldown');
         if (aoeCooldown) {
             aoeCooldown.style.height = '100%';
+        }
+    }
+    
+    fireIce() {
+        if (!this.hasIcePower || this.iceCooldown > 0) return;
+        
+        // Centro do jogador
+        const centerX = this.x + this.width / 2;
+        const centerY = this.y + this.height / 2;
+        
+        // Velocidade do projétil
+        const speed = 6; // Um pouco mais lento que a bola de fogo
+        const velocityX = Math.cos(this.angle) * speed;
+        const velocityY = Math.sin(this.angle) * speed;
+        
+        // Posição inicial do projétil (um pouco afastado do jogador)
+        const distance = 20; // Distância do centro do jogador
+        const x = centerX + Math.cos(this.angle) * distance - 5; // -5 para centralizar o projétil
+        const y = centerY + Math.sin(this.angle) * distance - 5; // -5 para centralizar o projétil
+        
+        // Cria múltiplos projéteis de gelo com base no multiplicador de poder
+        for (let i = 0; i < this.powerMultiplier; i++) {
+            // Pequeno desvio para cada projétil adicional
+            const angleOffset = i === 0 ? 0 : (Math.random() * 0.2 - 0.1);
+            const adjustedVelocityX = Math.cos(this.angle + angleOffset) * speed;
+            const adjustedVelocityY = Math.sin(this.angle + angleOffset) * speed;
+            
+            // Pequeno atraso para cada projétil adicional
+            setTimeout(() => {
+                const iceProjectile = new IceProjectile(
+                    x, 
+                    y, 
+                    10, 
+                    10, 
+                    adjustedVelocityX, 
+                    adjustedVelocityY, 
+                    this.fireballDamage * 0.7 // Dano um pouco menor que a bola de fogo
+                );
+                
+                // Aplica ricochete se o jogador tiver a habilidade
+                if (this.hasRicochet) {
+                    iceProjectile.canRicochet = true;
+                }
+                
+                this.game.addProjectile(iceProjectile);
+            }, i * 100); // 100ms de atraso entre cada projétil
+        }
+        
+        this.iceCooldown = this.iceMaxCooldown;
+        
+        // Atualiza a UI do cooldown
+        const iceCooldown = document.getElementById('iceCooldown');
+        if (iceCooldown) {
+            iceCooldown.style.height = '100%';
         }
     }
     
@@ -358,11 +486,18 @@ export class Player {
     }
     
     gainXP(amount) {
+        console.log(`Jogador ganhou ${amount} XP!`);
         this.xp += amount;
         
         // Verifica se subiu de nível
-        while (this.xp >= this.xpToNextLevel) {
+        if (this.xp >= this.xpToNextLevel) {
+            // Corrigido: Agora só sobe um nível por vez para evitar pular níveis
             this.levelUp();
+            // Ajusta o XP excedente para o próximo nível
+            if (this.xp > this.xpToNextLevel) {
+                const excessXP = this.xp - this.xpToNextLevel;
+                this.xp = excessXP;
+            }
         }
         
         // Atualiza a UI
@@ -373,8 +508,8 @@ export class Player {
     
     levelUp() {
         this.level++;
-        this.xp = 0;
-        this.xpToNextLevel = Math.floor(this.xpToNextLevel * 1.5);
+        // Não zera o XP aqui, pois já foi ajustado na função gainXP
+        this.xpToNextLevel = Math.floor(this.xpToNextLevel * 1.2);
         
         // Aumenta os atributos
         this.maxHealth += 10;
@@ -393,10 +528,21 @@ export class Player {
             console.log("Poder de AOE desbloqueado!");
             
             // Atualiza o slot de habilidade na UI
-            const aoeSkill = document.getElementById('aoeSkill');
+            const aoeSkill = document.querySelector('.skill.empty');
             if (aoeSkill) {
                 aoeSkill.classList.remove('empty');
+                aoeSkill.classList.add('aoe');
+                aoeSkill.dataset.skill = 'aoe';
                 aoeSkill.querySelector('.skill-icon').textContent = '💥';
+                
+                // Adiciona o ID para o cooldown
+                const cooldownOverlay = aoeSkill.querySelector('.cooldown-overlay');
+                if (cooldownOverlay) {
+                    cooldownOverlay.id = 'aoeCooldown';
+                }
+                
+                // Ajusta a opacidade
+                aoeSkill.style.opacity = '1';
             }
             
             // Desbloqueia o poder na lista de poderes
@@ -431,5 +577,95 @@ export class Player {
     // Limpa todas as marcas de rodas
     clearTrackMarks() {
         this.trackMarks = [];
+    }
+    
+    // Método para congelar um inimigo
+    freezeEnemy(enemy, duration) {
+        const enemyId = enemy.id;
+        
+        // Verifica se o inimigo já está congelado
+        if (this.frozenEnemies[enemyId]) {
+            // Atualiza a duração do congelamento
+            this.frozenEnemies[enemyId] = this.game.gameTime + duration;
+        } else {
+            // Congela o inimigo
+            this.frozenEnemies[enemyId] = this.game.gameTime + duration;
+            
+            // Salva a velocidade original do inimigo
+            enemy.originalSpeed = enemy.speed;
+            
+            // Congela o inimigo (velocidade zero)
+            enemy.speed = 0;
+            
+            // Adiciona efeito visual de congelamento
+            enemy.isFrozen = true;
+        }
+    }
+    
+    // Método para diminuir a velocidade de um inimigo
+    slowEnemy(enemy, slowFactor, duration) {
+        // Salva a velocidade original do inimigo se ainda não tiver sido salva
+        if (!enemy.originalSpeed) {
+            enemy.originalSpeed = enemy.speed;
+        }
+        
+        // Diminui a velocidade do inimigo
+        enemy.speed = enemy.originalSpeed * slowFactor;
+        
+        // Adiciona efeito visual de lentidão
+        enemy.isSlowed = true;
+        
+        // Define um temporizador para restaurar a velocidade
+        setTimeout(() => {
+            // Restaura a velocidade original apenas se o inimigo não estiver congelado
+            if (!enemy.isFrozen) {
+                enemy.speed = enemy.originalSpeed;
+                enemy.isSlowed = false;
+            }
+        }, duration);
+    }
+    
+    // Método para atualizar o estado dos inimigos congelados
+    updateFrozenEnemies() {
+        const currentTime = this.game.gameTime;
+        
+        for (const enemyId in this.frozenEnemies) {
+            const thawTime = this.frozenEnemies[enemyId];
+            
+            // Verifica se o tempo de congelamento acabou
+            if (currentTime >= thawTime) {
+                // Encontra o inimigo
+                const enemy = this.game.enemies.find(e => e.id === enemyId);
+                
+                // Restaura a velocidade do inimigo se ele ainda existir
+                if (enemy) {
+                    enemy.speed = enemy.originalSpeed;
+                    enemy.isFrozen = false;
+                }
+                
+                // Remove o inimigo da lista de congelados
+                delete this.frozenEnemies[enemyId];
+            }
+        }
+    }
+    
+    // Método para usar o poder selecionado
+    usePower() {
+        switch (this.selectedPower) {
+            case 'fireball':
+                this.fireProjectile();
+                break;
+            case 'aoe':
+                this.fireAOE();
+                break;
+            case 'ice':
+                this.fireIce();
+                break;
+        }
+    }
+    
+    // Método para trocar o poder selecionado
+    selectPower(powerId) {
+        this.selectedPower = powerId;
     }
 } 
