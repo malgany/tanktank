@@ -335,4 +335,307 @@ export class EnemyProjectile extends Projectile {
             color: this.color
         });
     }
+}
+
+export class IceProjectile extends Projectile {
+    constructor(x, y, width, height, velocityX, velocityY, damage) {
+        super(x, y, width, height, velocityX, velocityY, damage);
+        this.type = 'ice';
+        this.slowEffect = 0.5; // Reduz a velocidade do inimigo em 50%
+        this.slowDuration = 3000; // Duração do efeito em ms
+    }
+    
+    draw(ctx) {
+        // Desenha o projétil de gelo
+        ctx.fillStyle = '#00FFFF'; // Ciano
+        
+        // Desenha um círculo
+        ctx.beginPath();
+        ctx.arc(
+            this.x + this.width / 2, 
+            this.y + this.height / 2, 
+            this.width / 2, 
+            0, 
+            Math.PI * 2
+        );
+        ctx.fill();
+        
+        // Desenha um brilho interno
+        const gradient = ctx.createRadialGradient(
+            this.x + this.width / 2, 
+            this.y + this.height / 2, 
+            0,
+            this.x + this.width / 2, 
+            this.y + this.height / 2, 
+            this.width / 2
+        );
+        
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+        gradient.addColorStop(1, 'rgba(0, 255, 255, 0)');
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(
+            this.x + this.width / 2, 
+            this.y + this.height / 2, 
+            this.width / 2, 
+            0, 
+            Math.PI * 2
+        );
+        ctx.fill();
+        
+        // Desenha as partículas
+        this.drawParticles(ctx);
+    }
+    
+    generateParticles() {
+        // Gera partículas iniciais
+        for (let i = 0; i < 10; i++) {
+            this.addParticle();
+        }
+    }
+    
+    addParticle() {
+        // Adiciona uma nova partícula
+        this.particles.push({
+            x: this.x + this.width / 2,
+            y: this.y + this.height / 2,
+            size: 1 + Math.random() * 3,
+            vx: (Math.random() - 0.5) * 2,
+            vy: (Math.random() - 0.5) * 2,
+            life: 100 + Math.random() * 200,
+            color: Math.random() < 0.5 ? '#FFFFFF' : '#00FFFF'
+        });
+    }
+}
+
+export class PoisonProjectile extends Projectile {
+    constructor(x, y, width, height, velocityX, velocityY, damage) {
+        super(x, y, width, height, velocityX, velocityY, damage);
+        this.type = 'poison';
+        this.poisonDamage = damage; // Usa o dano passado como parâmetro
+        this.poisonDuration = 5000; // Duração em ms (5 segundos)
+    }
+    
+    draw(ctx) {
+        // Desenha o projétil de veneno
+        ctx.fillStyle = '#8A2BE2'; // Roxo
+        
+        // Desenha um círculo
+        ctx.beginPath();
+        ctx.arc(
+            this.x + this.width / 2, 
+            this.y + this.height / 2, 
+            this.width / 2, 
+            0, 
+            Math.PI * 2
+        );
+        ctx.fill();
+        
+        // Desenha um brilho interno
+        const gradient = ctx.createRadialGradient(
+            this.x + this.width / 2, 
+            this.y + this.height / 2, 
+            0,
+            this.x + this.width / 2, 
+            this.y + this.height / 2, 
+            this.width / 2
+        );
+        
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+        gradient.addColorStop(1, 'rgba(138, 43, 226, 0)');
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(
+            this.x + this.width / 2, 
+            this.y + this.height / 2, 
+            this.width / 2, 
+            0, 
+            Math.PI * 2
+        );
+        ctx.fill();
+        
+        // Desenha as partículas
+        this.drawParticles(ctx);
+    }
+    
+    generateParticles() {
+        // Gera partículas iniciais
+        for (let i = 0; i < 10; i++) {
+            this.addParticle();
+        }
+    }
+    
+    addParticle() {
+        // Adiciona uma nova partícula
+        this.particles.push({
+            x: this.x + this.width / 2,
+            y: this.y + this.height / 2,
+            size: 1 + Math.random() * 3,
+            vx: (Math.random() - 0.5) * 2,
+            vy: (Math.random() - 0.5) * 2,
+            life: 100 + Math.random() * 200,
+            color: Math.random() < 0.5 ? '#9932CC' : '#8A2BE2' // Tons de roxo
+        });
+    }
+}
+
+export class ArrowProjectile extends Projectile {
+    constructor(x, y, width, height, velocityX, velocityY, damage, maxDistance) {
+        super(x, y, width, height, velocityX, velocityY, damage);
+        this.type = 'arrow';
+        this.startX = x;
+        this.startY = y;
+        this.maxDistance = maxDistance; // Distância máxima que a flecha pode percorrer
+        this.distanceTraveled = 0;
+    }
+    
+    update(deltaTime) {
+        // Posição anterior
+        const oldX = this.x;
+        const oldY = this.y;
+        
+        // Move o projétil
+        this.x += this.velocityX;
+        this.y += this.velocityY;
+        
+        // Calcula a distância percorrida neste frame
+        const dx = this.x - oldX;
+        const dy = this.y - oldY;
+        this.distanceTraveled += Math.sqrt(dx * dx + dy * dy);
+        
+        // Se a flecha atingiu sua distância máxima, marca para remoção
+        if (this.distanceTraveled >= this.maxDistance) {
+            this.x = -100; // Move para fora da tela para ser removido
+            this.y = -100;
+            return;
+        }
+        
+        // Verifica ricochete nas paredes se tiver a habilidade
+        if (this.canRicochet && this.ricochetsLeft > 0) {
+            // Código de ricochete existente...
+            const canvas = document.getElementById('gameCanvas');
+            
+            // Ricochete na borda esquerda
+            if (this.x <= 0) {
+                this.x = 0;
+                this.velocityX = Math.abs(this.velocityX);
+                this.ricochetsLeft--;
+                this.hasRicocheted = true;
+                this.addRicochetEffect();
+            }
+            
+            // Ricochete na borda direita
+            if (this.x + this.width >= canvas.width) {
+                this.x = canvas.width - this.width;
+                this.velocityX = -Math.abs(this.velocityX);
+                this.ricochetsLeft--;
+                this.hasRicocheted = true;
+                this.addRicochetEffect();
+            }
+            
+            // Ricochete na borda superior
+            if (this.y <= 0) {
+                this.y = 0;
+                this.velocityY = Math.abs(this.velocityY);
+                this.ricochetsLeft--;
+                this.hasRicocheted = true;
+                this.addRicochetEffect();
+            }
+            
+            // Ricochete na borda inferior
+            if (this.y + this.height >= canvas.height) {
+                this.y = canvas.height - this.height;
+                this.velocityY = -Math.abs(this.velocityY);
+                this.ricochetsLeft--;
+                this.hasRicocheted = true;
+                this.addRicochetEffect();
+            }
+        }
+        
+        // Atualiza as partículas
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            const particle = this.particles[i];
+            
+            // Move a partícula
+            particle.x += particle.vx;
+            particle.y += particle.vy;
+            
+            // Reduz o tempo de vida
+            particle.life -= deltaTime;
+            
+            // Remove partículas expiradas
+            if (particle.life <= 0) {
+                this.particles.splice(i, 1);
+            }
+        }
+        
+        // Gera novas partículas
+        if (Math.random() < 0.3) {
+            this.addParticle();
+        }
+    }
+    
+    draw(ctx) {
+        // Salva o contexto para aplicar rotação
+        ctx.save();
+        
+        // Translada para o centro do projétil
+        ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+        
+        // Calcula o ângulo da flecha com base na velocidade
+        const angle = Math.atan2(this.velocityY, this.velocityX);
+        ctx.rotate(angle);
+        
+        // Desenha a flecha
+        ctx.fillStyle = '#8B4513'; // Marrom para a flecha
+        
+        // Corpo da flecha (retângulo)
+        ctx.fillRect(-this.width / 2, -this.height / 4, this.width, this.height / 2);
+        
+        // Ponta da flecha (triângulo)
+        ctx.beginPath();
+        ctx.moveTo(this.width / 2, -this.height / 2);
+        ctx.lineTo(this.width / 2 + this.height / 2, 0);
+        ctx.lineTo(this.width / 2, this.height / 2);
+        ctx.closePath();
+        ctx.fillStyle = '#696969'; // Cinza escuro para a ponta
+        ctx.fill();
+        
+        // Penas da flecha (na parte traseira)
+        ctx.beginPath();
+        ctx.moveTo(-this.width / 2, -this.height / 2);
+        ctx.lineTo(-this.width / 2 - this.height / 3, 0);
+        ctx.lineTo(-this.width / 2, this.height / 2);
+        ctx.closePath();
+        ctx.fillStyle = '#F5F5F5'; // Branco para as penas
+        ctx.fill();
+        
+        // Restaura o contexto
+        ctx.restore();
+        
+        // Desenha as partículas
+        this.drawParticles(ctx);
+    }
+    
+    generateParticles() {
+        // Gera partículas iniciais (menos que outros projéteis)
+        for (let i = 0; i < 5; i++) {
+            this.addParticle();
+        }
+    }
+    
+    addParticle() {
+        // Adiciona uma nova partícula
+        this.particles.push({
+            x: this.x + this.width / 2,
+            y: this.y + this.height / 2,
+            size: 1 + Math.random() * 2,
+            vx: (Math.random() - 0.5) * 1.5,
+            vy: (Math.random() - 0.5) * 1.5,
+            life: 50 + Math.random() * 100,
+            color: Math.random() < 0.5 ? '#D2B48C' : '#8B4513' // Tons de marrom
+        });
+    }
 } 

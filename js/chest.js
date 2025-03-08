@@ -19,30 +19,38 @@ export class Chest {
     determineItem() {
         const rand = Math.random();
         
-        if (rand < 0.15) {
+        if (rand < 0.125) {
             this.itemType = 'powerUp';
             this.itemName = '+1';
             this.itemDescription = 'Aumenta todos os poderes em 1';
-        } else if (rand < 0.3) {
+        } else if (rand < 0.25) {
             this.itemType = 'ricochet';
             this.itemName = 'Ricochete';
             this.itemDescription = 'Projéteis ricocheteiam nas paredes';
-        } else if (rand < 0.45) {
+        } else if (rand < 0.375) {
             this.itemType = 'fireball';
             this.itemName = 'Tiro de Canhão';
             this.itemDescription = 'Dispara uma bola de fogo na direção do cursor';
-        } else if (rand < 0.6) {
+        } else if (rand < 0.5) {
             this.itemType = 'ice';
             this.itemName = 'Poder de Gelo';
-            this.itemDescription = 'Tiro de gelo que diminui a velocidade dos inimigos';
-        } else if (rand < 0.75) {
+            this.itemDescription = 'Tiro de gelo que congela os inimigos por 2 segundos';
+        } else if (rand < 0.625) {
             this.itemType = 'aoe';
             this.itemName = 'Ataque em Área';
             this.itemDescription = 'Causa dano em área aos inimigos próximos';
+        } else if (rand < 0.75) {
+            this.itemType = 'poison';
+            this.itemName = 'Veneno';
+            this.itemDescription = 'Dispara um projétil de veneno que causa dano ao longo do tempo';
+        } else if (rand < 0.875) {
+            this.itemType = 'arrow';
+            this.itemName = 'Flechas';
+            this.itemDescription = 'Dispara flechas rápidas com alcance limitado';
         } else {
             this.itemType = 'cooldownReduction';
             this.itemName = 'Ampulheta Arcana';
-            this.itemDescription = 'Reduz o tempo de recarga dos ataques em 30% permanentemente';
+            this.itemDescription = 'Reduz o tempo de recarga dos ataques em 2.5% permanentemente';
         }
     }
     
@@ -238,85 +246,43 @@ export class Chest {
                 }
                 break;
                 
+            case 'poison':
+                // Cria um alerta flutuante
+                this.game.createFloatingAlert(`VENENO`, this.x, this.y - 20, '#ff00ff');
+                // Verifica se o poder é diferente do atual
+                if (this.game.player.currentPower !== this.itemType) {
+                    // Mostra a tela de troca de poderes
+                    this.game.showPowerSwapModal(this.itemType);
+                } else {
+                    // Se for o mesmo poder, aumenta o dano do veneno
+                    this.game.player.poisonDamage += 1; // Aumenta 1 ponto de dano
+                    this.game.ui.showMessage(`Veneno melhorado! Dano aumentado!`, 3000);
+                    this.game.createFloatingAlert(`DANO +1`, this.x, this.y - 40, '#ff00ff');
+                }
+                break;
+                
+            case 'arrow':
+                // Cria um alerta flutuante
+                this.game.createFloatingAlert(`FLECHAS`, this.x, this.y - 20, '#ff0000');
+                // Verifica se o poder é diferente do atual
+                if (this.game.player.currentPower !== this.itemType) {
+                    // Mostra a tela de troca de poderes
+                    this.game.showPowerSwapModal(this.itemType);
+                } else {
+                    // Se for o mesmo poder, aumenta o alcance das flechas
+                    this.game.player.arrowRange += 10; // Aumenta 10 pixels no alcance
+                    this.game.ui.showMessage(`Flechas melhoradas! Alcance aumentado!`, 3000);
+                    this.game.createFloatingAlert(`ALCANCE +10`, this.x, this.y - 40, '#ff0000');
+                }
+                break;
+                
             case 'cooldownReduction':
                 // Aplica o efeito de redução de cooldown
-                this.game.player.applyCooldownReduction(0.7, 0); // 30% de redução (0.7x) permanente
-                this.game.ui.showMessage(`Ampulheta Arcana! Tempo de recarga reduzido em 30% permanentemente!`, 3000);
+                this.game.player.applyCooldownReduction(0.975, 0); // 2.5% de redução (0.975x) permanente
+                this.game.ui.showMessage(`Ampulheta Arcana! Tempo de recarga reduzido em 2.5% permanentemente!`, 3000);
                 // Cria um alerta flutuante
-                this.game.createFloatingAlert(`-30% COOLDOWN`, this.x, this.y - 20, '#00ffff');
+                this.game.createFloatingAlert(`-2.5% COOLDOWN`, this.x, this.y - 20, '#00ffff');
                 break;
         }
-    }
-}
-
-export class IceProjectile extends Projectile {
-    constructor(x, y, width, height, velocityX, velocityY, damage) {
-        super(x, y, width, height, velocityX, velocityY, damage);
-        this.type = 'ice';
-        this.slowEffect = 0.5; // Reduz a velocidade do inimigo em 50%
-        this.slowDuration = 3000; // Duração do efeito em ms
-    }
-    
-    draw(ctx) {
-        // Desenha o projétil de gelo
-        ctx.fillStyle = '#00FFFF'; // Ciano
-        
-        // Desenha um círculo
-        ctx.beginPath();
-        ctx.arc(
-            this.x + this.width / 2, 
-            this.y + this.height / 2, 
-            this.width / 2, 
-            0, 
-            Math.PI * 2
-        );
-        ctx.fill();
-        
-        // Desenha um brilho interno
-        const gradient = ctx.createRadialGradient(
-            this.x + this.width / 2, 
-            this.y + this.height / 2, 
-            0,
-            this.x + this.width / 2, 
-            this.y + this.height / 2, 
-            this.width / 2
-        );
-        
-        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
-        gradient.addColorStop(1, 'rgba(0, 255, 255, 0)');
-        
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(
-            this.x + this.width / 2, 
-            this.y + this.height / 2, 
-            this.width / 2, 
-            0, 
-            Math.PI * 2
-        );
-        ctx.fill();
-        
-        // Desenha as partículas
-        this.drawParticles(ctx);
-    }
-    
-    generateParticles() {
-        // Gera partículas iniciais
-        for (let i = 0; i < 10; i++) {
-            this.addParticle();
-        }
-    }
-    
-    addParticle() {
-        // Adiciona uma nova partícula
-        this.particles.push({
-            x: this.x + this.width / 2,
-            y: this.y + this.height / 2,
-            size: 1 + Math.random() * 3,
-            vx: (Math.random() - 0.5) * 2,
-            vy: (Math.random() - 0.5) * 2,
-            life: 100 + Math.random() * 200,
-            color: Math.random() < 0.5 ? '#FFFFFF' : '#00FFFF'
-        });
     }
 } 

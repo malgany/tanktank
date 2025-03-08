@@ -1,9 +1,11 @@
 import { Player } from './player.js';
-import { World } from './world.js';
 import { Enemy } from './enemy.js';
-import { UI } from './ui.js';
 import { InputHandler } from './input.js';
 import { Chest } from './chest.js';
+import { Projectile, IceProjectile, PoisonProjectile, ArrowProjectile } from './projectile.js';
+import { AOEEffect } from './aoe.js';
+import { World } from './world.js';
+import { UI } from './ui.js';
 
 export class Game {
     constructor() {
@@ -137,15 +139,18 @@ export class Game {
         });
         
         // Adiciona função de depuração ao objeto window
-        window.debugGame = {
-            forceTransition: (direction) => this.forceTransition(direction),
-            getCurrentPosition: () => {
-                return {
-                    screen: { x: this.currentScreenX, y: this.currentScreenY },
-                    player: { x: this.player.x, y: this.player.y },
-                    canvas: { width: this.canvas.width, height: this.canvas.height }
-                };
-            }
+        if (!window.debugGame) {
+            window.debugGame = {};
+        }
+        
+        // Adiciona métodos de depuração
+        window.debugGame.forceTransition = (direction) => this.forceTransition(direction);
+        window.debugGame.getCurrentPosition = () => {
+            return {
+                screen: { x: this.currentScreenX, y: this.currentScreenY },
+                player: { x: this.player.x, y: this.player.y },
+                canvas: { width: this.canvas.width, height: this.canvas.height }
+            };
         };
         
         // Exibe mensagem de ajuda no console
@@ -164,8 +169,21 @@ export class Game {
         // Cria o modal de troca de poderes
         this.createPowerSwapModal();
         
+        // Cria o modal de configuração
+        this.createConfigModal();
+        
         // Sistema de alertas temporários
         this.floatingAlerts = [];
+        
+        // Adiciona o listener para o atalho do modal de configuração (tecla *)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '*') {
+                this.toggleConfigModal();
+            }
+        });
+        
+        // Carrega as configurações salvas do localStorage
+        this.loadConfig();
         
         requestAnimationFrame(this.gameLoop.bind(this));
     }
@@ -383,8 +401,14 @@ export class Game {
                         
                         // Se for um projétil de gelo, aplica o efeito de lentidão ou congelamento
                         if (projectile.type === 'ice') {
-                            // Sempre congela o inimigo por 2 segundos no segundo tiro
+                            // Congela o inimigo por 2 segundos (2000ms)
                             this.player.freezeEnemy(enemy, 2000); // Congela por 2 segundos
+                        }
+                        
+                        // Se for um projétil de veneno, aplica o efeito de envenenamento
+                        if (projectile.type === 'poison') {
+                            // Envenena o inimigo usando o dano do projétil
+                            this.player.poisonEnemy(enemy, projectile.poisonDamage, 5000);
                         }
                         
                         // Remove o projétil
@@ -1520,5 +1544,850 @@ export class Game {
             this.ctx.fillText(alert.text, alert.x, alert.y);
             this.ctx.restore();
         }
+    }
+    
+    // Método para criar o modal de configuração
+    createConfigModal() {
+        // Verifica se o modal já existe no DOM
+        if (document.getElementById('configModal')) {
+            this.configModal = document.getElementById('configModal');
+            return;
+        }
+        
+        // Cria o modal de configuração
+        this.configModal = document.createElement('div');
+        this.configModal.id = 'configModal';
+        this.configModal.className = 'modal';
+        this.configModal.style.display = 'none';
+        
+        // Conteúdo do modal
+        this.configModal.innerHTML = `
+            <div class="modal-content config-modal">
+                <div class="modal-header">
+                    <h2>Configurações do Jogo</h2>
+                    <button id="closeConfigBtn" class="close-btn">×</button>
+                </div>
+                
+                <div class="config-tabs">
+                    <button class="tab-btn active" data-tab="player">Jogador</button>
+                    <button class="tab-btn" data-tab="enemies">Inimigos</button>
+                    <button class="tab-btn" data-tab="powers">Poderes</button>
+                    <button class="tab-btn" data-tab="items">Itens</button>
+                    <button class="tab-btn" data-tab="world">Mundo</button>
+                </div>
+                
+                <div class="config-content">
+                    <!-- Configurações do Jogador -->
+                    <div class="tab-content active" id="player-tab">
+                        <h3>Atributos do Jogador</h3>
+                        <div class="config-group">
+                            <div class="config-item">
+                                <label for="playerHealth">Vida Máxima:</label>
+                                <input type="number" id="playerHealth" value="${this.player.maxHealth}">
+                            </div>
+                            <div class="config-item">
+                                <label for="playerSpeed">Velocidade:</label>
+                                <input type="number" id="playerSpeed" value="${this.player.speed}" step="0.1">
+                            </div>
+                            <div class="config-item">
+                                <label for="playerXpToNextLevel">XP para Próximo Nível:</label>
+                                <input type="number" id="playerXpToNextLevel" value="${this.player.xpToNextLevel}">
+                            </div>
+                            <div class="config-item">
+                                <label for="playerInvulnerableDuration">Duração de Invulnerabilidade (ms):</label>
+                                <input type="number" id="playerInvulnerableDuration" value="${this.player.invulnerableDuration}">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Configurações dos Inimigos -->
+                    <div class="tab-content" id="enemies-tab">
+                        <h3>Geração de Inimigos</h3>
+                        <div class="config-group">
+                            <div class="config-item">
+                                <label for="baseEnemyCount">Quantidade Base de Inimigos:</label>
+                                <input type="number" id="baseEnemyCount" value="2" min="1" max="10">
+                            </div>
+                            <div class="config-item">
+                                <label for="enemyPowerMultiplier">Multiplicador de Poder:</label>
+                                <input type="number" id="enemyPowerMultiplier" value="1" step="0.1" min="0.1">
+                            </div>
+                        </div>
+                        
+                        <h3>Atributos dos Inimigos por Zona</h3>
+                        <div class="config-group">
+                            <table class="config-table">
+                                <thead>
+                                    <tr>
+                                        <th>Zona</th>
+                                        <th>Vida Base</th>
+                                        <th>Dano Base</th>
+                                        <th>XP Base</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Planície (0)</td>
+                                        <td><input type="number" id="zone0Health" value="20"></td>
+                                        <td><input type="number" id="zone0Damage" value="5"></td>
+                                        <td><input type="number" id="zone0XP" value="10"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Floresta (1)</td>
+                                        <td><input type="number" id="zone1Health" value="35"></td>
+                                        <td><input type="number" id="zone1Damage" value="8"></td>
+                                        <td><input type="number" id="zone1XP" value="20"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Montanhas (2)</td>
+                                        <td><input type="number" id="zone2Health" value="50"></td>
+                                        <td><input type="number" id="zone2Damage" value="11"></td>
+                                        <td><input type="number" id="zone2XP" value="30"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Deserto (3)</td>
+                                        <td><input type="number" id="zone3Health" value="65"></td>
+                                        <td><input type="number" id="zone3Damage" value="14"></td>
+                                        <td><input type="number" id="zone3XP" value="40"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Configurações dos Poderes -->
+                    <div class="tab-content" id="powers-tab">
+                        <h3>Cooldowns e Danos</h3>
+                        <div class="config-group">
+                            <table class="config-table">
+                                <thead>
+                                    <tr>
+                                        <th>Poder</th>
+                                        <th>Cooldown (ms)</th>
+                                        <th>Dano</th>
+                                        <th>Tamanho</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Tiro de Canhão</td>
+                                        <td><input type="number" id="fireballCooldown" value="${this.player.fireballMaxCooldown}"></td>
+                                        <td><input type="number" id="fireballDamage" value="${this.player.fireballDamage}"></td>
+                                        <td><input type="number" id="fireballSize" value="${this.player.fireballSize}"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Gelo</td>
+                                        <td><input type="number" id="iceCooldown" value="2000"></td>
+                                        <td><input type="number" id="iceDamage" value="${this.player.fireballDamage * 0.7}"></td>
+                                        <td><input type="number" id="iceSize" value="${this.player.iceSize}"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Ataque em Área</td>
+                                        <td><input type="number" id="aoeCooldown" value="${this.player.aoeMaxCooldown}"></td>
+                                        <td><input type="number" id="aoeDamage" value="${this.player.aoeDamage}"></td>
+                                        <td><input type="number" id="aoeSize" value="${this.player.aoeSize}"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Veneno</td>
+                                        <td><input type="number" id="poisonCooldown" value="${this.player.poisonMaxCooldown}"></td>
+                                        <td><input type="number" id="poisonDamage" value="${this.player.poisonDamage}"></td>
+                                        <td><input type="number" id="poisonSize" value="${this.player.poisonSize}"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Flechas</td>
+                                        <td><input type="number" id="arrowCooldown" value="${this.player.arrowMaxCooldown}"></td>
+                                        <td><input type="number" id="arrowDamage" value="${this.player.arrowDamage}"></td>
+                                        <td><input type="number" id="arrowSize" value="${this.player.arrowSize}"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <h3>Efeitos Especiais</h3>
+                        <div class="config-group">
+                            <div class="config-item">
+                                <label for="iceFreezeTime">Tempo de Congelamento (ms):</label>
+                                <input type="number" id="iceFreezeTime" value="2000">
+                            </div>
+                            <div class="config-item">
+                                <label for="poisonDuration">Duração do Veneno (ms):</label>
+                                <input type="number" id="poisonDuration" value="5000">
+                            </div>
+                            <div class="config-item">
+                                <label for="arrowRange">Alcance das Flechas (% da tela):</label>
+                                <input type="number" id="arrowRange" value="50" min="10" max="100">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Configurações dos Itens -->
+                    <div class="tab-content" id="items-tab">
+                        <h3>Baús</h3>
+                        <div class="config-group">
+                            <div class="config-item">
+                                <label for="chestSpawnChance">Chance de Spawn (%):</label>
+                                <input type="number" id="chestSpawnChance" value="${this.chestSpawnChance * 100}" min="0" max="100">
+                            </div>
+                            <div class="config-item">
+                                <label for="minChestSpawnInterval">Intervalo Mínimo (ms):</label>
+                                <input type="number" id="minChestSpawnInterval" value="${this.minChestSpawnInterval}">
+                            </div>
+                        </div>
+                        
+                        <h3>Probabilidades de Itens</h3>
+                        <div class="config-group">
+                            <table class="config-table">
+                                <thead>
+                                    <tr>
+                                        <th>Item</th>
+                                        <th>Probabilidade (%)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Poder +1</td>
+                                        <td><input type="number" id="powerUpChance" value="12.5" min="0" max="100" step="0.1"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Ricochete</td>
+                                        <td><input type="number" id="ricochetChance" value="12.5" min="0" max="100" step="0.1"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Tiro de Canhão</td>
+                                        <td><input type="number" id="fireballChance" value="12.5" min="0" max="100" step="0.1"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Gelo</td>
+                                        <td><input type="number" id="iceChance" value="12.5" min="0" max="100" step="0.1"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Ataque em Área</td>
+                                        <td><input type="number" id="aoeChance" value="12.5" min="0" max="100" step="0.1"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Veneno</td>
+                                        <td><input type="number" id="poisonChance" value="12.5" min="0" max="100" step="0.1"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Flechas</td>
+                                        <td><input type="number" id="arrowChance" value="12.5" min="0" max="100" step="0.1"></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Redução de Cooldown</td>
+                                        <td><input type="number" id="cooldownReductionChance" value="12.5" min="0" max="100" step="0.1"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <h3>Melhorias</h3>
+                        <div class="config-group">
+                            <div class="config-item">
+                                <label for="cooldownReductionValue">Redução de Cooldown (%):</label>
+                                <input type="number" id="cooldownReductionValue" value="2.5" min="0.1" max="50" step="0.1">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Configurações do Mundo -->
+                    <div class="tab-content" id="world-tab">
+                        <h3>Geração do Mundo</h3>
+                        <div class="config-group">
+                            <div class="config-item">
+                                <label for="worldSize">Tamanho do Mundo:</label>
+                                <input type="number" id="worldSize" value="20" min="5" max="100">
+                            </div>
+                            <div class="config-item">
+                                <label for="plainsChance">Chance de Planície (%):</label>
+                                <input type="number" id="plainsChance" value="40" min="0" max="100">
+                            </div>
+                            <div class="config-item">
+                                <label for="forestChance">Chance de Floresta (%):</label>
+                                <input type="number" id="forestChance" value="30" min="0" max="100">
+                            </div>
+                            <div class="config-item">
+                                <label for="mountainsChance">Chance de Montanhas (%):</label>
+                                <input type="number" id="mountainsChance" value="20" min="0" max="100">
+                            </div>
+                            <div class="config-item">
+                                <label for="desertChance">Chance de Deserto (%):</label>
+                                <input type="number" id="desertChance" value="10" min="0" max="100">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button id="saveConfigBtn" class="btn">Salvar Configurações</button>
+                    <button id="resetConfigBtn" class="btn">Restaurar Padrões</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(this.configModal);
+        
+        // Adiciona estilos CSS para o modal
+        const style = document.createElement('style');
+        style.textContent = `
+            .config-modal {
+                max-width: 1000px;
+                max-height: 90vh;
+                overflow-y: auto;
+                background-color: #1a1a2e;
+                color: #e6e6e6;
+                border-radius: 10px;
+                box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+                width: 90%;
+            }
+            
+            .modal-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 15px 20px;
+                border-bottom: 1px solid #333;
+                background-color: #16213e;
+                border-radius: 10px 10px 0 0;
+            }
+            
+            .modal-header h2 {
+                margin: 0;
+                color: #00b4d8;
+                font-size: 28px;
+            }
+            
+            .close-btn {
+                background: none;
+                border: none;
+                color: #e6e6e6;
+                font-size: 24px;
+                cursor: pointer;
+                transition: color 0.3s;
+            }
+            
+            .close-btn:hover {
+                color: #ff6b6b;
+            }
+            
+            .config-tabs {
+                display: flex;
+                background-color: #16213e;
+                border-bottom: 1px solid #333;
+                overflow-x: auto;
+                padding: 0 10px;
+            }
+            
+            .tab-btn {
+                padding: 10px 20px;
+                background: none;
+                border: none;
+                color: #e6e6e6;
+                cursor: pointer;
+                transition: all 0.3s;
+                font-size: 16px;
+                white-space: nowrap;
+            }
+            
+            .tab-btn:hover {
+                color: #00b4d8;
+            }
+            
+            .tab-btn.active {
+                color: #00b4d8;
+                border-bottom: 2px solid #00b4d8;
+            }
+            
+            .config-content {
+                padding: 30px;
+            }
+            
+            .tab-content {
+                display: none;
+            }
+            
+            .tab-content.active {
+                display: block;
+            }
+            
+            .config-group {
+                margin-bottom: 25px;
+                background-color: #1e2a3a;
+                padding: 20px;
+                border-radius: 8px;
+            }
+            
+            .config-item {
+                margin-bottom: 10px;
+                display: flex;
+                align-items: center;
+            }
+            
+            .config-item label {
+                flex: 1;
+                margin-right: 10px;
+            }
+            
+            .config-item input, .config-item select {
+                width: 150px;
+                padding: 8px;
+                background-color: #2a3950;
+                border: 1px solid #3a4a60;
+                color: #e6e6e6;
+                border-radius: 4px;
+            }
+            
+            .config-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 10px;
+            }
+            
+            .config-table th, .config-table td {
+                padding: 10px 15px;
+                text-align: left;
+                border-bottom: 1px solid #333;
+            }
+            
+            .config-table th {
+                color: #00b4d8;
+                font-weight: bold;
+            }
+            
+            .config-table input {
+                width: 100px;
+                padding: 6px;
+                background-color: #2a3950;
+                border: 1px solid #3a4a60;
+                color: #e6e6e6;
+                border-radius: 4px;
+            }
+            
+            h3 {
+                color: #00b4d8;
+                margin-top: 0;
+                margin-bottom: 20px;
+                font-size: 22px;
+                border-bottom: 1px solid #333;
+                padding-bottom: 10px;
+            }
+            
+            .modal-footer {
+                padding: 15px 20px;
+                border-top: 1px solid #333;
+                display: flex;
+                justify-content: flex-end;
+                gap: 10px;
+            }
+            
+            .btn {
+                padding: 10px 20px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 16px;
+                transition: all 0.3s;
+            }
+            
+            #saveConfigBtn {
+                background-color: #00b4d8;
+                color: #fff;
+            }
+            
+            #saveConfigBtn:hover {
+                background-color: #0096c7;
+            }
+            
+            #resetConfigBtn {
+                background-color: #3a4a60;
+                color: #e6e6e6;
+            }
+            
+            #resetConfigBtn:hover {
+                background-color: #4a5a70;
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // Adiciona os event listeners para as abas
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Remove a classe active de todos os botões e conteúdos
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+                
+                // Adiciona a classe active ao botão clicado e ao conteúdo correspondente
+                button.classList.add('active');
+                document.getElementById(`${button.dataset.tab}-tab`).classList.add('active');
+            });
+        });
+        
+        // Adiciona o event listener para o botão de fechar
+        document.getElementById('closeConfigBtn').addEventListener('click', () => {
+            this.hideConfigModal();
+        });
+        
+        // Adiciona o event listener para o botão de salvar
+        document.getElementById('saveConfigBtn').addEventListener('click', () => {
+            this.saveConfig();
+        });
+        
+        // Adiciona o event listener para o botão de restaurar padrões
+        document.getElementById('resetConfigBtn').addEventListener('click', () => {
+            this.resetConfig();
+        });
+    }
+    
+    // Método para mostrar o modal de configuração
+    showConfigModal() {
+        this.isConfigVisible = true;
+        this.configModal.style.display = 'flex';
+        
+        // Atualiza os valores dos campos do formulário com os valores atuais do jogo
+        this.updateConfigModalValues();
+    }
+    
+    // Método para atualizar os valores dos campos do formulário com os valores atuais do jogo
+    updateConfigModalValues() {
+        // Configurações do jogador
+        document.getElementById('playerHealth').value = this.player.maxHealth;
+        document.getElementById('playerSpeed').value = this.player.speed;
+        document.getElementById('playerXpToNextLevel').value = this.player.xpToNextLevel;
+        document.getElementById('playerInvulnerableDuration').value = this.player.invulnerableDuration;
+        
+        // Configurações dos poderes
+        document.getElementById('fireballCooldown').value = this.player.fireballMaxCooldown;
+        document.getElementById('fireballDamage').value = this.player.fireballDamage;
+        document.getElementById('fireballSize').value = this.player.fireballSize;
+        
+        // Verifica se os elementos existem antes de tentar definir seus valores
+        if (document.getElementById('iceCooldown')) {
+            const icePower = this.player.availablePowers.find(p => p.id === 'ice');
+            document.getElementById('iceCooldown').value = icePower ? icePower.maxCooldown : 2000;
+            document.getElementById('iceDamage').value = this.player.fireballDamage * 0.7;
+            document.getElementById('iceSize').value = this.player.iceSize;
+        }
+        
+        document.getElementById('aoeCooldown').value = this.player.aoeMaxCooldown;
+        document.getElementById('aoeDamage').value = this.player.aoeDamage;
+        document.getElementById('aoeSize').value = this.player.aoeSize;
+        
+        if (document.getElementById('poisonCooldown')) {
+            document.getElementById('poisonCooldown').value = this.player.poisonMaxCooldown;
+            document.getElementById('poisonDamage').value = this.player.poisonDamage;
+            document.getElementById('poisonSize').value = this.player.poisonSize;
+        }
+        
+        if (document.getElementById('arrowCooldown')) {
+            document.getElementById('arrowCooldown').value = this.player.arrowMaxCooldown;
+            document.getElementById('arrowDamage').value = this.player.arrowDamage;
+            document.getElementById('arrowSize').value = this.player.arrowSize;
+        }
+        
+        // Configurações de baús
+        document.getElementById('chestSpawnChance').value = this.chestSpawnChance * 100;
+        document.getElementById('minChestSpawnInterval').value = this.minChestSpawnInterval;
+    }
+    
+    // Método para ocultar o modal de configuração
+    hideConfigModal() {
+        this.isConfigVisible = false;
+        this.configModal.style.display = 'none';
+        
+        // Retoma o jogo quando o modal é fechado
+        this.isPaused = false;
+    }
+    
+    // Método para alternar o modal de configuração
+    toggleConfigModal() {
+        if (this.isConfigVisible) {
+            this.hideConfigModal();
+        } else {
+            this.showConfigModal();
+        }
+    }
+    
+    // Método para salvar as configurações
+    saveConfig() {
+        // Configurações do jogador
+        this.player.maxHealth = parseInt(document.getElementById('playerHealth').value) || this.player.maxHealth;
+        this.player.health = Math.min(this.player.health, this.player.maxHealth);
+        this.player.speed = parseFloat(document.getElementById('playerSpeed').value) || this.player.speed;
+        this.player.xpToNextLevel = parseInt(document.getElementById('playerXpToNextLevel').value) || this.player.xpToNextLevel;
+        this.player.invulnerableDuration = parseInt(document.getElementById('playerInvulnerableDuration').value) || this.player.invulnerableDuration;
+        
+        // Configurações dos poderes
+        const fireballCooldown = parseInt(document.getElementById('fireballCooldown').value);
+        if (!isNaN(fireballCooldown)) {
+            this.player.fireballMaxCooldown = fireballCooldown;
+            const fireballPower = this.player.availablePowers.find(p => p.id === 'fireball');
+            if (fireballPower) fireballPower.maxCooldown = fireballCooldown;
+        }
+        
+        const fireballDamage = parseInt(document.getElementById('fireballDamage').value);
+        if (!isNaN(fireballDamage)) {
+            this.player.fireballDamage = fireballDamage;
+        }
+        
+        const fireballSize = parseInt(document.getElementById('fireballSize').value);
+        if (!isNaN(fireballSize)) {
+            this.player.fireballSize = fireballSize;
+        }
+        
+        // Gelo
+        const iceCooldown = parseInt(document.getElementById('iceCooldown').value);
+        if (!isNaN(iceCooldown)) {
+            const icePower = this.player.availablePowers.find(p => p.id === 'ice');
+            if (icePower) icePower.maxCooldown = iceCooldown;
+        }
+        
+        const iceSize = parseInt(document.getElementById('iceSize').value);
+        if (!isNaN(iceSize)) {
+            this.player.iceSize = iceSize;
+        }
+        
+        // AOE
+        const aoeCooldown = parseInt(document.getElementById('aoeCooldown').value);
+        if (!isNaN(aoeCooldown)) {
+            this.player.aoeMaxCooldown = aoeCooldown;
+            const aoePower = this.player.availablePowers.find(p => p.id === 'aoe');
+            if (aoePower) aoePower.maxCooldown = aoeCooldown;
+        }
+        
+        const aoeDamage = parseInt(document.getElementById('aoeDamage').value);
+        if (!isNaN(aoeDamage)) {
+            this.player.aoeDamage = aoeDamage;
+        }
+        
+        const aoeSize = parseInt(document.getElementById('aoeSize').value);
+        if (!isNaN(aoeSize)) {
+            this.player.aoeSize = aoeSize;
+        }
+        
+        // Veneno
+        const poisonCooldown = parseInt(document.getElementById('poisonCooldown').value);
+        if (!isNaN(poisonCooldown)) {
+            this.player.poisonMaxCooldown = poisonCooldown;
+            const poisonPower = this.player.availablePowers.find(p => p.id === 'poison');
+            if (poisonPower) poisonPower.maxCooldown = poisonCooldown;
+        }
+        
+        const poisonDamage = parseFloat(document.getElementById('poisonDamage').value);
+        if (!isNaN(poisonDamage)) {
+            this.player.poisonDamage = poisonDamage;
+        }
+        
+        const poisonSize = parseInt(document.getElementById('poisonSize').value);
+        if (!isNaN(poisonSize)) {
+            this.player.poisonSize = poisonSize;
+        }
+        
+        // Flechas
+        const arrowCooldown = parseInt(document.getElementById('arrowCooldown').value);
+        if (!isNaN(arrowCooldown)) {
+            this.player.arrowMaxCooldown = arrowCooldown;
+            const arrowPower = this.player.availablePowers.find(p => p.id === 'arrow');
+            if (arrowPower) arrowPower.maxCooldown = arrowCooldown;
+        }
+        
+        const arrowDamage = parseInt(document.getElementById('arrowDamage').value);
+        if (!isNaN(arrowDamage)) {
+            this.player.arrowDamage = arrowDamage;
+        }
+        
+        const arrowSize = parseInt(document.getElementById('arrowSize').value);
+        if (!isNaN(arrowSize)) {
+            this.player.arrowSize = arrowSize;
+        }
+        
+        // Configurações de baús
+        const chestSpawnChance = parseFloat(document.getElementById('chestSpawnChance').value);
+        if (!isNaN(chestSpawnChance)) {
+            this.chestSpawnChance = chestSpawnChance / 100;
+        }
+        
+        const minChestSpawnInterval = parseInt(document.getElementById('minChestSpawnInterval').value);
+        if (!isNaN(minChestSpawnInterval)) {
+            this.minChestSpawnInterval = minChestSpawnInterval;
+        }
+        
+        // Salva as configurações no localStorage para persistência
+        const config = {
+            player: {
+                maxHealth: this.player.maxHealth,
+                speed: this.player.speed,
+                xpToNextLevel: this.player.xpToNextLevel,
+                invulnerableDuration: this.player.invulnerableDuration,
+                fireballMaxCooldown: this.player.fireballMaxCooldown,
+                fireballDamage: this.player.fireballDamage,
+                fireballSize: this.player.fireballSize,
+                aoeMaxCooldown: this.player.aoeMaxCooldown,
+                aoeDamage: this.player.aoeDamage,
+                aoeSize: this.player.aoeSize,
+                poisonMaxCooldown: this.player.poisonMaxCooldown,
+                poisonDamage: this.player.poisonDamage,
+                poisonSize: this.player.poisonSize,
+                arrowMaxCooldown: this.player.arrowMaxCooldown,
+                arrowDamage: this.player.arrowDamage,
+                arrowSize: this.player.arrowSize
+            },
+            game: {
+                chestSpawnChance: this.chestSpawnChance,
+                minChestSpawnInterval: this.minChestSpawnInterval
+            }
+        };
+        
+        localStorage.setItem('gameConfig', JSON.stringify(config));
+        
+        // Exibe uma mensagem de confirmação
+        this.createFloatingAlert('Configurações salvas com sucesso!', this.canvas.width / 2, this.canvas.height / 2, '#00b4d8');
+        
+        // Fecha o modal
+        this.hideConfigModal();
+        
+        // Recarrega a página para aplicar as novas configurações
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000); // Espera 1 segundo para que o usuário veja a mensagem de confirmação
+    }
+    
+    // Método para carregar as configurações do localStorage
+    loadConfig() {
+        const savedConfig = localStorage.getItem('gameConfig');
+        
+        if (savedConfig) {
+            try {
+                const config = JSON.parse(savedConfig);
+                
+                // Aplica as configurações do jogador
+                if (config.player) {
+                    this.player.maxHealth = config.player.maxHealth || this.player.maxHealth;
+                    this.player.health = config.player.maxHealth || this.player.health; // Restaura a vida para o máximo
+                    this.player.speed = config.player.speed || this.player.speed;
+                    this.player.xpToNextLevel = config.player.xpToNextLevel || this.player.xpToNextLevel;
+                    this.player.invulnerableDuration = config.player.invulnerableDuration || this.player.invulnerableDuration;
+                    
+                    // Configurações dos poderes
+                    this.player.fireballMaxCooldown = config.player.fireballMaxCooldown || this.player.fireballMaxCooldown;
+                    this.player.fireballDamage = config.player.fireballDamage || this.player.fireballDamage;
+                    this.player.fireballSize = config.player.fireballSize || this.player.fireballSize;
+                    
+                    this.player.aoeMaxCooldown = config.player.aoeMaxCooldown || this.player.aoeMaxCooldown;
+                    this.player.aoeDamage = config.player.aoeDamage || this.player.aoeDamage;
+                    this.player.aoeSize = config.player.aoeSize || this.player.aoeSize;
+                    
+                    this.player.poisonMaxCooldown = config.player.poisonMaxCooldown || this.player.poisonMaxCooldown;
+                    this.player.poisonDamage = config.player.poisonDamage || this.player.poisonDamage;
+                    this.player.poisonSize = config.player.poisonSize || this.player.poisonSize;
+                    
+                    this.player.arrowMaxCooldown = config.player.arrowMaxCooldown || this.player.arrowMaxCooldown;
+                    this.player.arrowDamage = config.player.arrowDamage || this.player.arrowDamage;
+                    this.player.arrowSize = config.player.arrowSize || this.player.arrowSize;
+                    
+                    // Atualiza os poderes disponíveis
+                    const fireballPower = this.player.availablePowers.find(p => p.id === 'fireball');
+                    if (fireballPower) fireballPower.maxCooldown = this.player.fireballMaxCooldown;
+                    
+                    const aoePower = this.player.availablePowers.find(p => p.id === 'aoe');
+                    if (aoePower) aoePower.maxCooldown = this.player.aoeMaxCooldown;
+                    
+                    const poisonPower = this.player.availablePowers.find(p => p.id === 'poison');
+                    if (poisonPower) poisonPower.maxCooldown = this.player.poisonMaxCooldown;
+                    
+                    const arrowPower = this.player.availablePowers.find(p => p.id === 'arrow');
+                    if (arrowPower) arrowPower.maxCooldown = this.player.arrowMaxCooldown;
+                }
+                
+                // Aplica as configurações do jogo
+                if (config.game) {
+                    this.chestSpawnChance = config.game.chestSpawnChance || this.chestSpawnChance;
+                    this.minChestSpawnInterval = config.game.minChestSpawnInterval || this.minChestSpawnInterval;
+                }
+                
+                console.log('Configurações carregadas com sucesso do localStorage');
+            } catch (error) {
+                console.error('Erro ao carregar configurações:', error);
+            }
+        }
+    }
+    
+    // Métodos auxiliares para obter valores dos inputs com tratamento de erro
+    getInputValueInt(id, defaultValue) {
+        const element = document.getElementById(id);
+        if (element) {
+            return parseInt(element.value) || defaultValue;
+        }
+        return defaultValue;
+    }
+    
+    getInputValueFloat(id, defaultValue) {
+        const element = document.getElementById(id);
+        if (element) {
+            return parseFloat(element.value) || defaultValue;
+        }
+        return defaultValue;
+    }
+    
+    // Método para restaurar as configurações padrão
+    resetConfig() {
+        // Valores padrão do jogador
+        document.getElementById('playerHealth').value = 100;
+        document.getElementById('playerSpeed').value = 3;
+        document.getElementById('playerXpToNextLevel').value = 100;
+        document.getElementById('playerInvulnerableDuration').value = 1000;
+        
+        // Valores padrão dos poderes
+        document.getElementById('fireballCooldown').value = 500;
+        document.getElementById('fireballDamage').value = 10;
+        document.getElementById('fireballSize').value = 10;
+        
+        document.getElementById('iceCooldown').value = 2000;
+        document.getElementById('iceDamage').value = 7;
+        document.getElementById('iceSize').value = 10;
+        
+        document.getElementById('aoeCooldown').value = 3000;
+        document.getElementById('aoeDamage').value = 15;
+        document.getElementById('aoeSize').value = 80;
+        
+        document.getElementById('poisonCooldown').value = 1500;
+        document.getElementById('poisonDamage').value = 0.5;
+        document.getElementById('poisonSize').value = 10;
+        
+        document.getElementById('arrowCooldown').value = 250;
+        document.getElementById('arrowDamage').value = 12;
+        document.getElementById('arrowSize').value = 12;
+        
+        // Valores padrão de efeitos especiais
+        document.getElementById('iceFreezeTime').value = 2000;
+        document.getElementById('poisonDuration').value = 5000;
+        document.getElementById('arrowRange').value = 50;
+        
+        // Valores padrão de baús
+        document.getElementById('chestSpawnChance').value = 80;
+        document.getElementById('minChestSpawnInterval').value = 10000;
+        
+        // Valores padrão de probabilidades de itens
+        document.getElementById('powerUpChance').value = 12.5;
+        document.getElementById('ricochetChance').value = 12.5;
+        document.getElementById('fireballChance').value = 12.5;
+        document.getElementById('iceChance').value = 12.5;
+        document.getElementById('aoeChance').value = 12.5;
+        document.getElementById('poisonChance').value = 12.5;
+        document.getElementById('arrowChance').value = 12.5;
+        document.getElementById('cooldownReductionChance').value = 12.5;
+        
+        // Valores padrão de melhorias
+        document.getElementById('cooldownReductionValue').value = 2.5;
+        
+        // Remove as configurações do localStorage
+        localStorage.removeItem('gameConfig');
+        
+        // Exibe uma mensagem de confirmação
+        this.createFloatingAlert('Configurações restauradas para os valores padrão!', this.canvas.width / 2, this.canvas.height / 2, '#00b4d8');
+        
+        // Recarrega a página para aplicar as configurações padrão
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000); // Espera 1 segundo para que o usuário veja a mensagem de confirmação
     }
 } 

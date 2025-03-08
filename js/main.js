@@ -6,7 +6,10 @@ window.addEventListener('DOMContentLoaded', () => {
     const game = new Game();
     
     // Adiciona o jogo à janela para depuração
-    window.debugGame = game;
+    if (!window.debugGame) {
+        window.debugGame = {};
+    }
+    window.debugGame.instance = game;
     
     console.log('Jogo inicializado com sucesso!');
 }); 

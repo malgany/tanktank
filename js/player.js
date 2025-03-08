@@ -1,6 +1,5 @@
-import { Projectile } from './projectile.js';
+import { Projectile, IceProjectile, PoisonProjectile, ArrowProjectile } from './projectile.js';
 import { AOEEffect } from './aoe.js';
-import { IceProjectile } from './chest.js';
 
 export class Player {
     constructor(game) {
@@ -8,48 +7,56 @@ export class Player {
         
         // Posição e dimensões
         this.width = 30;
-        this.height = 40; // Um pouco mais comprido para parecer um tanque
+        this.height = 30;
         
         // Posiciona o jogador no centro da tela
         this.x = game.canvas.width / 2 - this.width / 2;
         this.y = game.canvas.height / 2 - this.height / 2;
         
         // Movimento
-        this.speed = 2;
+        this.speed = 3;
         this.moveX = 0;
         this.moveY = 0;
+        
+        // Vida e XP
+        this.health = 100;
+        this.maxHealth = 100;
+        this.xp = 0;
+        this.level = 1;
+        this.xpToNextLevel = 100;
+        
+        // Invulnerabilidade temporária após tomar dano
+        this.invulnerableTime = 0;
+        this.invulnerableDuration = 1000; // 1 segundo
         
         // Knockback
         this.knockbackX = 0;
         this.knockbackY = 0;
         this.knockbackDuration = 0;
-        this.invulnerableTime = 0;
         
-        // Atributos
-        this.maxHealth = 50;
-        this.health = this.maxHealth;
-        this.level = 1;
-        this.xp = 0;
-        this.xpToNextLevel = 50;
-        
-        // Habilidades
-        this.fireballDamage = 20;
+        // Cooldowns de habilidades
         this.fireballCooldown = 0;
-        this.fireballMaxCooldown = 1000; // 1 segundo
-        
-        this.aoeDamage = 40;
+        this.fireballMaxCooldown = 500; // 0.5 segundos
         this.aoeCooldown = 0;
-        this.aoeMaxCooldown = 10000; // 10 segundos
-        
-        // Habilidade de gelo
-        this.iceDamage = 15;
+        this.aoeMaxCooldown = 3000; // 3 segundos
         this.iceCooldown = 0;
-        this.iceMaxCooldown = 2000; // 2 segundos
+        this.poisonCooldown = 0;
+        this.poisonMaxCooldown = 1500; // 1.5 segundos
+        this.arrowCooldown = 0;
+        this.arrowMaxCooldown = 250; // 0.25 segundos (metade do tiro de fogo)
         
-        // Tamanho dos projéteis (aumenta quando coleta o mesmo poder)
+        // Dano das habilidades
+        this.fireballDamage = 10;
+        this.aoeDamage = 15;
+        this.poisonDamage = 0.5; // Dano por segundo do veneno
+        this.arrowDamage = 12; // Dano das flechas
+        
+        // Tamanho dos projéteis
         this.fireballSize = 10; // Tamanho inicial
         this.iceSize = 10; // Tamanho inicial
         this.aoeSize = 80; // Raio inicial
+        this.poisonSize = 10; // Tamanho inicial
+        this.arrowSize = 12; // Tamanho inicial
         
         // Direção atual (para o disparo)
         this.direction = 'right'; // 'up', 'right', 'down', 'left'
@@ -99,15 +106,37 @@ export class Player {
                 icon: '💥',
                 cooldown: 0,
                 maxCooldown: this.aoeMaxCooldown
+            },
+            {
+                id: 'poison',
+                name: 'Veneno',
+                description: 'Dispara um projétil de veneno que causa dano ao longo do tempo',
+                icon: '☠️',
+                cooldown: 0,
+                maxCooldown: this.poisonMaxCooldown
+            },
+            {
+                id: 'arrow',
+                name: 'Flechas',
+                description: 'Dispara flechas rápidas com alcance limitado',
+                icon: '🏹',
+                cooldown: 0,
+                maxCooldown: this.arrowMaxCooldown
             }
         ];
         
         // Seleciona um poder aleatório inicial
-        const randomPowerIndex = Math.floor(Math.random() * 3);
+        const randomPowerIndex = Math.floor(Math.random() * this.availablePowers.length);
         this.currentPower = this.availablePowers[randomPowerIndex].id;
         
         // Atualiza o slot de poder na UI com o poder inicial
         this.updatePowerSlotUI();
+        
+        // Sistema de partículas para o efeito de redução de cooldown
+        this.cooldownParticles = [];
+        
+        // Alcance das flechas
+        this.arrowRange = 0; // Será calculado como metade da tela
     }
     
     update(deltaTime) {
@@ -183,6 +212,36 @@ export class Player {
             // Atualiza a UI do cooldown se este for o poder atual
             if (this.currentPower === 'ice') {
                 const cooldownPercent = (this.iceCooldown / this.availablePowers.find(p => p.id === 'ice').maxCooldown) * 100;
+                const powerCooldown = document.getElementById('powerCooldown');
+                if (powerCooldown) {
+                    powerCooldown.style.height = `${cooldownPercent}%`;
+                }
+            }
+        }
+        
+        if (this.poisonCooldown > 0) {
+            // Aplica o multiplicador de cooldown se estiver ativo
+            this.poisonCooldown -= deltaTime * (1 / this.cooldownMultiplier);
+            if (this.poisonCooldown < 0) this.poisonCooldown = 0;
+            
+            // Atualiza a UI do cooldown se este for o poder atual
+            if (this.currentPower === 'poison') {
+                const cooldownPercent = (this.poisonCooldown / this.availablePowers.find(p => p.id === 'poison').maxCooldown) * 100;
+                const powerCooldown = document.getElementById('powerCooldown');
+                if (powerCooldown) {
+                    powerCooldown.style.height = `${cooldownPercent}%`;
+                }
+            }
+        }
+        
+        if (this.arrowCooldown > 0) {
+            // Aplica o multiplicador de cooldown se estiver ativo
+            this.arrowCooldown -= deltaTime * (1 / this.cooldownMultiplier);
+            if (this.arrowCooldown < 0) this.arrowCooldown = 0;
+            
+            // Atualiza a UI do cooldown se este for o poder atual
+            if (this.currentPower === 'arrow') {
+                const cooldownPercent = (this.arrowCooldown / this.availablePowers.find(p => p.id === 'arrow').maxCooldown) * 100;
                 const powerCooldown = document.getElementById('powerCooldown');
                 if (powerCooldown) {
                     powerCooldown.style.height = `${cooldownPercent}%`;
@@ -671,6 +730,10 @@ export class Player {
             
             // Adiciona efeito visual de congelamento
             enemy.isFrozen = true;
+            
+            // Garante que o inimigo não se mova durante o congelamento
+            enemy.moveDirection = 0;
+            enemy.moveTimer = 0;
         }
     }
     
@@ -713,6 +776,12 @@ export class Player {
                 if (enemy) {
                     enemy.speed = enemy.originalSpeed;
                     enemy.isFrozen = false;
+                    
+                    // Reinicia o movimento do inimigo
+                    if (enemy.type === 'random') {
+                        enemy.moveDirection = Math.random() * Math.PI * 2;
+                        enemy.moveTimer = 0;
+                    }
                 }
                 
                 // Remove o inimigo da lista de congelados
@@ -789,6 +858,12 @@ export class Player {
                 break;
             case 'ice':
                 this.fireIce();
+                break;
+            case 'poison':
+                this.firePoison();
+                break;
+            case 'arrow':
+                this.fireArrow();
                 break;
         }
     }
@@ -892,5 +967,140 @@ export class Player {
         }
         
         this.cooldownParticles.push(particle);
+    }
+    
+    // Método para envenenar um inimigo
+    poisonEnemy(enemy, damage, duration) {
+        const enemyId = enemy.id;
+        
+        // Verifica se o inimigo já está envenenado
+        if (enemy.isPoisoned) {
+            // Acumula o dano do veneno
+            enemy.poisonDamage += damage;
+            
+            // Atualiza a duração do envenenamento
+            enemy.poisonEndTime = Math.max(enemy.poisonEndTime, this.game.gameTime + duration);
+        } else {
+            // Envenena o inimigo
+            enemy.isPoisoned = true;
+            enemy.poisonDamage = damage;
+            enemy.poisonEndTime = this.game.gameTime + duration;
+            enemy.lastPoisonTick = this.game.gameTime;
+        }
+    }
+    
+    // Método para atirar projétil de veneno
+    firePoison() {
+        // Verifica se o poder está em cooldown
+        if (this.poisonCooldown > 0) return;
+        
+        // Centro do jogador
+        const centerX = this.x + this.width / 2;
+        const centerY = this.y + this.height / 2;
+        
+        // Velocidade do projétil
+        const speed = 7; // Velocidade intermediária
+        const velocityX = Math.cos(this.angle) * speed;
+        const velocityY = Math.sin(this.angle) * speed;
+        
+        // Posição inicial do projétil (um pouco afastado do jogador)
+        const distance = 20; // Distância do centro do jogador
+        const x = centerX + Math.cos(this.angle) * distance - 5; // -5 para centralizar o projétil
+        const y = centerY + Math.sin(this.angle) * distance - 5; // -5 para centralizar o projétil
+        
+        // Cria múltiplos projéteis de veneno com base no multiplicador de poder
+        for (let i = 0; i < this.powerMultiplier; i++) {
+            // Pequeno desvio para cada projétil adicional
+            const angleOffset = i === 0 ? 0 : (Math.random() * 0.2 - 0.1);
+            const adjustedVelocityX = Math.cos(this.angle + angleOffset) * speed;
+            const adjustedVelocityY = Math.sin(this.angle + angleOffset) * speed;
+            
+            // Pequeno atraso para cada projétil adicional
+            setTimeout(() => {
+                const poisonProjectile = new PoisonProjectile(
+                    x, 
+                    y, 
+                    this.poisonSize, 
+                    this.poisonSize, 
+                    adjustedVelocityX, 
+                    adjustedVelocityY, 
+                    this.poisonDamage // Usa o dano específico do veneno
+                );
+                
+                // Aplica ricochete se o jogador tiver a habilidade
+                if (this.hasRicochet) {
+                    poisonProjectile.canRicochet = true;
+                }
+                
+                this.game.addProjectile(poisonProjectile);
+            }, i * 100); // 100ms de atraso entre cada projétil
+        }
+        
+        // Define o cooldown (aplicando o multiplicador de cooldown)
+        const power = this.availablePowers.find(p => p.id === 'poison');
+        this.poisonCooldown = power.maxCooldown * this.cooldownMultiplier;
+        
+        // Atualiza a UI
+        this.updatePowerSlotUI();
+    }
+    
+    // Método para atirar flechas
+    fireArrow() {
+        // Verifica se o poder está em cooldown
+        if (this.arrowCooldown > 0) return;
+        
+        // Centro do jogador
+        const centerX = this.x + this.width / 2;
+        const centerY = this.y + this.height / 2;
+        
+        // Velocidade do projétil
+        const speed = 10; // Flechas são mais rápidas
+        const velocityX = Math.cos(this.angle) * speed;
+        const velocityY = Math.sin(this.angle) * speed;
+        
+        // Posição inicial do projétil (um pouco afastado do jogador)
+        const distance = 20; // Distância do centro do jogador
+        const x = centerX + Math.cos(this.angle) * distance - 5; // -5 para centralizar o projétil
+        const y = centerY + Math.sin(this.angle) * distance - 5; // -5 para centralizar o projétil
+        
+        // Calcula a distância máxima (metade da tela)
+        const canvas = document.getElementById('gameCanvas');
+        const maxDistance = Math.min(canvas.width, canvas.height) / 2;
+        
+        // Cria múltiplas flechas com base no multiplicador de poder
+        for (let i = 0; i < this.powerMultiplier; i++) {
+            // Pequeno desvio para cada projétil adicional
+            const angleOffset = i === 0 ? 0 : (Math.random() * 0.1 - 0.05); // Desvio menor para flechas
+            const adjustedVelocityX = Math.cos(this.angle + angleOffset) * speed;
+            const adjustedVelocityY = Math.sin(this.angle + angleOffset) * speed;
+            
+            // Pequeno atraso para cada projétil adicional
+            setTimeout(() => {
+                const arrowProjectile = new ArrowProjectile(
+                    x, 
+                    y, 
+                    this.arrowSize, 
+                    this.arrowSize, 
+                    adjustedVelocityX, 
+                    adjustedVelocityY, 
+                    this.arrowDamage, // Usa o dano específico das flechas
+                    maxDistance // Distância máxima que a flecha pode percorrer
+                );
+                
+                // Aplica ricochete se o jogador tiver a habilidade
+                if (this.hasRicochet) {
+                    arrowProjectile.canRicochet = true;
+                }
+                
+                this.game.addProjectile(arrowProjectile);
+            }, i * 50); // 50ms de atraso entre cada flecha (mais rápido que outros projéteis)
+        }
+        
+        // Define o cooldown (aplicando o multiplicador de cooldown)
+        const power = this.availablePowers.find(p => p.id === 'arrow');
+        this.arrowCooldown = power.maxCooldown * this.cooldownMultiplier;
+        
+        // Atualiza a UI
+        this.updatePowerSlotUI();
     }
 } 

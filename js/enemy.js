@@ -71,6 +71,13 @@ export class Enemy {
         this.isFrozen = false; // Se está congelado
         this.iceParticles = []; // Partículas de gelo para efeito visual
         
+        // Sistema de envenenamento
+        this.isPoisoned = false; // Se está envenenado
+        this.poisonDamage = 0; // Dano por segundo do veneno
+        this.poisonEndTime = 0; // Tempo em que o efeito de veneno termina
+        this.lastPoisonTick = 0; // Último momento em que o veneno causou dano
+        this.poisonParticles = []; // Partículas de veneno para efeito visual
+        
         // ID único para o inimigo (para rastreamento de efeitos)
         this.id = Math.random().toString(36).substr(2, 9);
     }
@@ -169,6 +176,13 @@ export class Enemy {
     }
     
     update(deltaTime, player, game) {
+        // Se o inimigo estiver congelado, apenas atualiza os efeitos visuais
+        if (this.isFrozen) {
+            // Atualiza os efeitos visuais de gelo
+            this.updateIceEffects(deltaTime);
+            return;
+        }
+        
         // Atualiza o cooldown de tiro
         if (this.shootCooldown > 0) {
             this.shootCooldown -= deltaTime;
@@ -207,6 +221,9 @@ export class Enemy {
         if (this.type === 'broken') {
             this.updateSmokeParticles(deltaTime);
         }
+        
+        // Atualiza o efeito de veneno
+        this.updatePoisonEffects(deltaTime, game);
         
         // Verifica se deve atirar no jogador
         if (this.type !== 'broken' && this.shootCooldown <= 0) {
@@ -288,6 +305,11 @@ export class Enemy {
             return;
         }
         
+        // Inimigos congelados não se movem
+        if (this.isFrozen) {
+            return;
+        }
+        
         // Inimigos perseguidores verificam a distância do jogador
         if (this.type === 'pursuer') {
             const dx = player.x - this.x;
@@ -325,40 +347,20 @@ export class Enemy {
     
     draw(ctx) {
         // Se o inimigo estiver morto ou invisível, não desenha nada
-        if (this.dead || !this.visible) {
-            // Adiciona log para debug
-            if (this.dead && (this.x > 0 || this.y > 0)) {
-                console.log("Tentando desenhar inimigo morto:", this);
-            }
-            return; // Sai imediatamente sem desenhar nada
+        if (this.dead || !this.visible) return;
+        
+        // Calcula a pulsação
+        const pulseFactor = 1 + Math.sin(this.game.gameTime / 1000 * this.pulseRate + this.pulseOffset) * this.pulseAmount;
+        
+        // Determina a cor base com base no efeito de flash de dano
+        let baseColor = this.color;
+        if (this.damageFlash > 0) {
+            // Calcula a intensidade do flash (1.0 a 0.0)
+            const flashIntensity = this.damageFlash / 200;
+            
+            // Mistura a cor original com branco
+            baseColor = this.blendColors(this.color, '#FFFFFF', flashIntensity);
         }
-        
-        // Verifica se as coordenadas são válidas
-        if (isNaN(this.x) || isNaN(this.y)) {
-            console.log("Inimigo com coordenadas NaN:", this);
-            // Corrige as coordenadas para evitar problemas
-            this.x = 0;
-            this.y = 0;
-            this.dead = true;
-            this.visible = false;
-            return;
-        }
-        
-        // Verifica se as coordenadas são válidas (não está no canto superior esquerdo)
-        if (this.x < -100 || this.y < -100) {
-            console.log("Inimigo fora da tela:", this);
-            return; // Não desenha inimigos fora da tela
-        }
-        
-        const centerX = this.x + this.width / 2;
-        const centerY = this.y + this.height / 2;
-        
-        // Calcula o fator de pulsação
-        const time = Date.now() * 0.001; // Tempo em segundos
-        const pulseFactor = 1 + Math.sin(time * this.pulseRate + this.pulseOffset) * this.pulseAmount;
-        
-        // Define a cor com base no estado de dano
-        let baseColor = this.damageFlash > 0 ? '#ffffff' : this.color;
         
         // Modifica a cor se estiver congelado ou lento
         if (this.isFrozen) {
@@ -367,10 +369,19 @@ export class Enemy {
             // Mistura a cor original com azul claro para efeito de lentidão
             const originalColor = this.damageFlash > 0 ? '#ffffff' : this.color;
             baseColor = this.blendColors(originalColor, '#96D9FF', 0.3);
+        } else if (this.isPoisoned) {
+            // Mistura a cor original com roxo para efeito de envenenamento
+            const originalColor = this.damageFlash > 0 ? '#ffffff' : this.color;
+            baseColor = this.blendColors(originalColor, '#8A2BE2', 0.3);
         }
         
         // Salva o contexto para aplicar transformações
         ctx.save();
+        
+        // Translada para o centro do inimigo
+        const centerX = this.x + this.width / 2;
+        const centerY = this.y + this.height / 2;
+        
         ctx.translate(centerX, centerY);
         
         // Aplica tremor se estiver congelado
@@ -387,6 +398,9 @@ export class Enemy {
         
         // Desenha os efeitos de gelo (atrás do tanque)
         this.drawIceEffects(ctx);
+        
+        // Desenha os efeitos de veneno (atrás do tanque)
+        this.drawPoisonEffects(ctx);
         
         // Desenha o tanque
         this.drawTank(ctx, baseColor);
@@ -760,5 +774,92 @@ export class Enemy {
     // Método para aplicar o cooldown de colisão
     applyCollisionCooldown() {
         this.collisionCooldown = this.collisionMaxCooldown;
+    }
+    
+    // Método para atualizar o efeito de veneno
+    updatePoisonEffects(deltaTime, game) {
+        // Verifica se o tempo de envenenamento acabou
+        if (game.gameTime >= this.poisonEndTime) {
+            this.isPoisoned = false;
+            return;
+        }
+        
+        // Aplica dano de veneno a cada segundo
+        if (game.gameTime - this.lastPoisonTick >= 1000) {
+            this.takeDamage(this.poisonDamage);
+            this.lastPoisonTick = game.gameTime;
+        }
+        
+        // Atualiza as partículas de veneno existentes
+        for (let i = this.poisonParticles.length - 1; i >= 0; i--) {
+            const particle = this.poisonParticles[i];
+            
+            // Reduz o tempo de vida
+            particle.life -= deltaTime;
+            
+            // Remove partículas expiradas
+            if (particle.life <= 0) {
+                this.poisonParticles.splice(i, 1);
+            }
+        }
+        
+        // Adiciona novas partículas de veneno
+        if (Math.random() < 0.3) {
+            this.addPoisonParticle();
+        }
+    }
+    
+    // Método para adicionar uma partícula de veneno
+    addPoisonParticle() {
+        const centerX = this.x + this.width / 2;
+        const centerY = this.y + this.height / 2;
+        
+        this.poisonParticles.push({
+            x: centerX + (Math.random() - 0.5) * this.width,
+            y: centerY + (Math.random() - 0.5) * this.height,
+            size: 1 + Math.random() * 3,
+            vx: (Math.random() - 0.5) * 0.5,
+            vy: (Math.random() - 0.5) * 0.5 - 0.3, // Tendência a subir
+            life: 500 + Math.random() * 1000,
+            alpha: 0.7 + Math.random() * 0.3
+        });
+    }
+    
+    // Método para desenhar as partículas de veneno
+    drawPoisonEffects(ctx) {
+        // Não desenha se não houver efeitos
+        if (!this.isPoisoned && this.poisonParticles.length === 0) {
+            return;
+        }
+        
+        // Desenha um efeito de aura de veneno se estiver envenenado
+        if (this.isPoisoned) {
+            ctx.save();
+            
+            // Cria um gradiente radial para a aura de veneno
+            const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(this.width, this.height) * 0.7);
+            gradient.addColorStop(0, 'rgba(138, 43, 226, 0.4)');
+            gradient.addColorStop(1, 'rgba(138, 43, 226, 0)');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(0, 0, Math.max(this.width, this.height) * 0.7, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+        
+        // Desenha as partículas de veneno
+        for (const particle of this.poisonParticles) {
+            ctx.save();
+            ctx.globalAlpha = particle.alpha * (particle.life / 1500);
+            ctx.fillStyle = '#8A2BE2'; // Roxo
+            
+            ctx.beginPath();
+            ctx.arc(particle.x - this.x, particle.y - this.y, particle.size, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
     }
 } 
