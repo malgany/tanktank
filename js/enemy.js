@@ -781,6 +781,8 @@ export class Enemy {
         // Verifica se o tempo de envenenamento acabou
         if (game.gameTime >= this.poisonEndTime) {
             this.isPoisoned = false;
+            // Limpa todas as partículas de veneno quando o efeito termina
+            this.poisonParticles = [];
             return;
         }
         

@@ -158,9 +158,10 @@ export class Player {
             this.x += this.moveX * this.speed;
             this.y += this.moveY * this.speed;
             
+            //console.log('x: ' + this.x, 'y: ' + this.y, 'width: ' + this.width, 'height: ' + this.height, 'canvasWidth: ' + this.game.canvas.width, 'canvasHeight: ' + this.game.canvas.height);
             // Limita o jogador às bordas do canvas
-            this.x = Math.max(0, Math.min(this.x, this.game.canvas.width - this.width));
-            this.y = Math.max(0, Math.min(this.y, this.game.canvas.height - this.height));
+            //this.x = Math.max(0, Math.min(this.x, this.game.canvas.width - this.width));
+            //this.y = Math.max(0, Math.min(this.y, this.game.canvas.height - this.height));
         }
         
         // Reduz o tempo de invulnerabilidade
@@ -756,6 +757,9 @@ export class Player {
             if (!enemy.isFrozen) {
                 enemy.speed = enemy.originalSpeed;
                 enemy.isSlowed = false;
+                
+                // Limpa todas as partículas de gelo quando o efeito terminar
+                enemy.iceParticles = [];
             }
         }, duration);
     }
@@ -776,6 +780,9 @@ export class Player {
                 if (enemy) {
                     enemy.speed = enemy.originalSpeed;
                     enemy.isFrozen = false;
+                    
+                    // Limpa todas as partículas de gelo quando o efeito termina
+                    enemy.iceParticles = [];
                     
                     // Reinicia o movimento do inimigo
                     if (enemy.type === 'random') {

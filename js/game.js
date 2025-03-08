@@ -471,8 +471,7 @@ export class Game {
         let direction = '';
         
         // Verifica se o jogador saiu da tela
-        console.log();
-        if (this.player.x <= 0) {
+        if (this.player.x < 0) {
             // Verifica se não está na borda do mundo
             if (this.currentScreenX > 0) {
                 // Salva os inimigos da tela atual antes de transicionar
@@ -489,7 +488,7 @@ export class Game {
                 this.player.x = 0;
                 this.ui.showMessage("Você atingiu o limite do mundo!", 2000);
             }
-        } else if (this.player.x + this.player.width >= this.canvas.width) {
+        } else if (this.player.x + this.player.width > this.canvas.width) {
             // Verifica se não está na borda do mundo
             if (this.currentScreenX < this.world.width - 1) {
                 // Salva os inimigos da tela atual antes de transicionar
@@ -506,7 +505,7 @@ export class Game {
                 this.player.x = this.canvas.width - this.player.width;
                 this.ui.showMessage("Você atingiu o limite do mundo!", 2000);
             }
-        } else if (this.player.y <= 0) {
+        } else if (this.player.y < 0) {
             // Verifica se não está na borda do mundo
             if (this.currentScreenY > 0) {
                 // Salva os inimigos da tela atual antes de transicionar
@@ -523,7 +522,7 @@ export class Game {
                 this.player.y = 0;
                 this.ui.showMessage("Você atingiu o limite do mundo!", 2000);
             }
-        } else if (this.player.y + this.player.height >= this.canvas.height) {
+        } else if (this.player.y + this.player.height > this.canvas.height) {
             // Verifica se não está na borda do mundo
             if (this.currentScreenY < this.world.height - 1) {
                 // Salva os inimigos da tela atual antes de transicionar

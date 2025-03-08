@@ -211,6 +211,12 @@ export class InputHandler {
         // Atualiza o movimento do jogador
         this.game.player.setMovement(moveX, moveY);
         
+        // Atualiza a direção do jogador para apontar para o mouse
+        // Isso garante que a mira seja atualizada mesmo quando o player se move com o mouse parado
+        if (moveX !== 0 || moveY !== 0) {
+            this.updatePlayerDirection();
+        }
+        
         // Verifica se o botão do mouse está pressionado e tenta usar o poder
         if (this.mouseDown) {
             this.game.player.usePower();
