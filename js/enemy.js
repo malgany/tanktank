@@ -78,6 +78,9 @@ export class Enemy {
         this.lastPoisonTick = 0; // Último momento em que o veneno causou dano
         this.poisonParticles = []; // Partículas de veneno para efeito visual
         
+        // Sistema de notificação de dano
+        this.damageNotifications = []; // Array para armazenar as notificações de dano
+        
         // ID único para o inimigo (para rastreamento de efeitos)
         this.id = Math.random().toString(36).substr(2, 9);
     }
@@ -269,6 +272,9 @@ export class Enemy {
         
         // Atualiza os efeitos visuais de gelo
         this.updateIceEffects(deltaTime);
+        
+        // Atualiza as notificações de dano
+        this.updateDamageNotifications(deltaTime);
     }
     
     updateSmokeParticles(deltaTime) {
@@ -374,6 +380,9 @@ export class Enemy {
             const originalColor = this.damageFlash > 0 ? '#ffffff' : this.color;
             baseColor = this.blendColors(originalColor, '#8A2BE2', 0.3);
         }
+        
+        // Desenha as notificações de dano
+        this.drawDamageNotifications(ctx);
         
         // Salva o contexto para aplicar transformações
         ctx.save();
@@ -536,6 +545,9 @@ export class Enemy {
         
         // Aplica o dano
         this.health -= amount;
+        
+        // Adiciona uma notificação de dano
+        this.addDamageNotification(amount);
         
         // Efeito visual de dano
         this.damageFlash = 100; // 100ms de flash
@@ -788,8 +800,31 @@ export class Enemy {
         
         // Aplica dano de veneno a cada segundo
         if (game.gameTime - this.lastPoisonTick >= 1000) {
-            this.takeDamage(this.poisonDamage);
+            // Aplica o dano sem chamar takeDamage para evitar flash de dano
+            this.health -= this.poisonDamage;
+            
+            // Adiciona uma notificação de dano específica para veneno
+            this.addDamageNotification(this.poisonDamage);
+            
+            // Atualiza o último tick de veneno
             this.lastPoisonTick = game.gameTime;
+            
+            // Verifica se o inimigo morreu
+            if (this.health <= 0) {
+                this.health = 0;
+                this.dead = true;
+                
+                // Gera um drop aleatório
+                const drop = this.generateDrop();
+                if (drop && this.game) {
+                    this.game.drops.push(drop);
+                }
+                
+                // Dá XP ao jogador
+                if (this.game && this.game.player) {
+                    this.game.player.gainXP(this.xpValue);
+                }
+            }
         }
         
         // Atualiza as partículas de veneno existentes
@@ -860,6 +895,68 @@ export class Enemy {
             ctx.beginPath();
             ctx.arc(particle.x - this.x, particle.y - this.y, particle.size, 0, Math.PI * 2);
             ctx.fill();
+            
+            ctx.restore();
+        }
+    }
+    
+    // Método para adicionar uma notificação de dano
+    addDamageNotification(amount) {
+        // Formata o valor do dano (arredonda para 1 casa decimal se for decimal)
+        const formattedAmount = Number.isInteger(amount) ? amount.toString() : amount.toFixed(1);
+        
+        this.damageNotifications.push({
+            value: formattedAmount,
+            x: this.x + this.width / 2,
+            y: this.y - 10, // Posição inicial acima do inimigo
+            opacity: 1,
+            scale: 1.2, // Escala inicial um pouco maior
+            life: 1000 // Duração da notificação em ms
+        });
+    }
+    
+    // Método para atualizar as notificações de dano
+    updateDamageNotifications(deltaTime) {
+        for (let i = this.damageNotifications.length - 1; i >= 0; i--) {
+            const notification = this.damageNotifications[i];
+            
+            // Atualiza a posição (movimento para cima)
+            notification.y -= 0.5;
+            
+            // Atualiza a opacidade (vai diminuindo)
+            notification.opacity = Math.max(0, notification.opacity - deltaTime / 1000);
+            
+            // Atualiza a escala (vai diminuindo)
+            notification.scale = Math.max(0.8, notification.scale - deltaTime / 2000);
+            
+            // Reduz o tempo de vida
+            notification.life -= deltaTime;
+            
+            // Remove notificações expiradas
+            if (notification.life <= 0) {
+                this.damageNotifications.splice(i, 1);
+            }
+        }
+    }
+    
+    // Método para desenhar as notificações de dano
+    drawDamageNotifications(ctx) {
+        for (const notification of this.damageNotifications) {
+            ctx.save();
+            
+            // Define a fonte com tamanho maior
+            ctx.font = `bold ${Math.floor(16 * notification.scale)}px Arial`;
+            
+            // Define a cor (vermelho com opacidade variável)
+            ctx.fillStyle = `rgba(255, 0, 0, ${notification.opacity})`;
+            
+            // Centraliza o texto
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // Desenha o texto com o valor do dano
+            const text = `-${notification.value}`;
+            ctx.fillText(text, notification.x, notification.y);
             
             ctx.restore();
         }

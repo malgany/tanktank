@@ -186,8 +186,10 @@ export class Chest {
     applyItemEffect() {
         switch (this.itemType) {
             case 'powerUp':
-                // Aumenta todos os poderes em 1
+                // Aumenta o multiplicador de poder
                 this.game.player.powerMultiplier = (this.game.player.powerMultiplier || 1) + 1;
+                // Atualiza as estatísticas
+                this.game.player.powerStats.powerMultiplier++;
                 this.game.ui.showMessage(`Poder +1! Todos os poderes aumentados!`, 3000);
                 // Cria um alerta flutuante
                 this.game.createFloatingAlert(`PODER +1`, this.x, this.y - 20, '#ff0000');
@@ -196,6 +198,8 @@ export class Chest {
             case 'ricochet':
                 // Ativa o ricochete para projéteis
                 this.game.player.hasRicochet = true;
+                // Atualiza as estatísticas
+                this.game.player.powerStats.ricochet++;
                 this.game.ui.showMessage(`Ricochete! Seus projéteis agora ricocheteiam nas paredes!`, 3000);
                 // Cria um alerta flutuante
                 this.game.createFloatingAlert(`RICOCHETE`, this.x, this.y - 20, '#00ff00');
@@ -224,10 +228,17 @@ export class Chest {
                     // Mostra a tela de troca de poderes
                     this.game.showPowerSwapModal(this.itemType);
                 } else {
-                    // Se for o mesmo poder, aumenta o tamanho do projétil
+                    // Se for o mesmo poder, aumenta o tamanho do projétil e a duração do congelamento
                     this.game.player.iceSize += 2; // Aumenta 2 pixels
-                    this.game.ui.showMessage(`Poder de Gelo melhorado! Projétil maior!`, 3000);
-                    this.game.createFloatingAlert(`PROJÉTIL +2`, this.x, this.y - 40, '#00ffff');
+                    this.game.player.iceDuration += 500; // Aumenta 0.5 segundos
+                    this.game.player.powerStats.iceDuration += 500; // Atualiza as estatísticas
+                    this.game.ui.showMessage(`Poder de Gelo melhorado! Projétil maior e congelamento mais longo!`, 3000);
+                    this.game.createFloatingAlert(`PROJÉTIL +2, DURAÇÃO +0.5s`, this.x, this.y - 40, '#00ffff');
+                    
+                    // Atualiza as informações do jogador se a tela de informações estiver aberta
+                    if (this.game.isPlayerInfoVisible) {
+                        this.game.updatePlayerInfo();
+                    }
                 }
                 break;
                 

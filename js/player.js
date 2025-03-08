@@ -58,6 +58,9 @@ export class Player {
         this.poisonSize = 10; // Tamanho inicial
         this.arrowSize = 12; // Tamanho inicial
         
+        // Duração dos efeitos
+        this.iceDuration = 2000; // Duração do congelamento em ms
+        
         // Direção atual (para o disparo)
         this.direction = 'right'; // 'up', 'right', 'down', 'left'
         
@@ -137,6 +140,21 @@ export class Player {
         
         // Alcance das flechas
         this.arrowRange = 0; // Será calculado como metade da tela
+        
+        // Rastreamento de poderes acumulados
+        this.powerStats = {
+            powerMultiplier: 0,
+            ricochet: 0,
+            cooldownReduction: 0,
+            totalCooldownReduction: 0,
+            iceDuration: 0,
+            poisonDamage: 0,
+            arrowDamage: 0,
+            aoeDamage: 0
+        };
+        
+        // Ricochete
+        this.ricochetCount = 0;
     }
     
     update(deltaTime) {
@@ -882,6 +900,10 @@ export class Player {
         
         // Não definimos mais um tempo de expiração
         this.cooldownReductionEndTime = 0; // Zero indica que não expira
+        
+        // Atualiza as estatísticas
+        this.powerStats.cooldownReduction++;
+        this.powerStats.totalCooldownReduction += (1 - multiplier) * 100;
         
         // Atualiza visualmente os cooldowns na UI
         this.updatePowerSlotUI();

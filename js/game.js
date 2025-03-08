@@ -87,81 +87,7 @@ export class Game {
         });
         
         // Configuração do modal de informações do jogador
-        this.playerInfoModal = document.getElementById('playerInfoModal');
         this.isPlayerInfoVisible = false;
-        
-        // Configurar botão de fechar informações
-        document.getElementById('closeInfoBtn').addEventListener('click', () => {
-            this.hidePlayerInfo();
-        });
-        
-        // Gera inimigos para a tela inicial
-        this.generateEnemiesForCurrentScreen();
-        
-        // Mostra a mensagem de zona inicial
-        const screenType = this.world.getScreenType(this.currentScreenX, this.currentScreenY);
-        let screenName = '';
-        
-        switch (screenType) {
-            case 'plains':
-                screenName = 'Planície';
-                break;
-            case 'forest':
-                screenName = 'Floresta';
-                break;
-            case 'mountains':
-                screenName = 'Montanhas';
-                break;
-            case 'desert':
-                screenName = 'Deserto';
-                break;
-            default:
-                screenName = 'Desconhecido';
-        }
-        
-        // Exibe mensagem de boas-vindas
-        this.ui.showMessage(`Bem-vindo à ${screenName}! Você está no centro do mapa [${this.currentScreenX}, ${this.currentScreenY}]`, 5000);
-        setTimeout(() => {
-            this.ui.showMessage(`Use as teclas WASD para se mover. Vá até as bordas da tela para explorar outras áreas!`, 5000);
-        }, 5500);
-        
-        // Atualiza a exibição das coordenadas
-        this.updateCoordinatesDisplay();
-        
-        window.addEventListener('resize', () => {
-            this.setupCanvas();
-            // Atualiza o tamanho do mapa completo quando a janela é redimensionada
-            if (this.isFullMapVisible) {
-                this.fullMapCanvas.width = this.fullMapCanvas.clientWidth;
-                this.fullMapCanvas.height = this.fullMapCanvas.clientHeight;
-                this.drawFullMap();
-            }
-        });
-        
-        // Adiciona função de depuração ao objeto window
-        if (!window.debugGame) {
-            window.debugGame = {};
-        }
-        
-        // Adiciona métodos de depuração
-        window.debugGame.forceTransition = (direction) => this.forceTransition(direction);
-        window.debugGame.getCurrentPosition = () => {
-            return {
-                screen: { x: this.currentScreenX, y: this.currentScreenY },
-                player: { x: this.player.x, y: this.player.y },
-                canvas: { width: this.canvas.width, height: this.canvas.height }
-            };
-        };
-        
-        // Exibe mensagem de ajuda no console
-        console.log("Funções de depuração disponíveis:");
-        console.log("- debugGame.forceTransition('up'|'down'|'left'|'right')");
-        console.log("- debugGame.getCurrentPosition()");
-        
-        // Configuração de baús
-        this.chestSpawnChance = 0.8; // Aumentado para 80% de chance (era 30%)
-        this.lastChestSpawnTime = 0;
-        this.minChestSpawnInterval = 10000; // Reduzido para 10 segundos (era 60000 = 1 minuto)
         
         // Cria o modal de informações do jogador
         this.createPlayerInfoModal();
@@ -401,8 +327,8 @@ export class Game {
                         
                         // Se for um projétil de gelo, aplica o efeito de lentidão ou congelamento
                         if (projectile.type === 'ice') {
-                            // Congela o inimigo por 2 segundos (2000ms)
-                            this.player.freezeEnemy(enemy, 2000); // Congela por 2 segundos
+                            // Congela o inimigo usando a duração definida no jogador
+                            this.player.freezeEnemy(enemy, this.player.iceDuration);
                         }
                         
                         // Se for um projétil de veneno, aplica o efeito de envenenamento
@@ -973,40 +899,129 @@ export class Game {
     // Método para mostrar as informações do jogador
     showPlayerInfo() {
         this.isPlayerInfoVisible = true;
-        this.playerInfoModal.style.display = 'flex';
-        this.updatePlayerInfo();
         
-        // Pausa o jogo enquanto a tela de informações está aberta
-        this.isPaused = true;
+        // Verifica se o playerInfoModal existe antes de acessar sua propriedade style
+        if (this.playerInfoModal) {
+            // Verifica se o modal tem a classe modal-container (HTML) ou a classe modal (JS)
+            if (this.playerInfoModal.classList.contains('modal-container')) {
+                this.playerInfoModal.style.display = 'flex';
+            } else {
+                this.playerInfoModal.style.display = 'flex';
+            }
+            this.updatePlayerInfo();
+            
+            // Pausa o jogo enquanto a tela de informações está aberta
+            this.isPaused = true;
+        } else {
+            console.error("playerInfoModal não encontrado!");
+            // Tenta criar o modal se ele não existir
+            this.createPlayerInfoModal();
+            // Tenta mostrar novamente após criar
+            if (this.playerInfoModal) {
+                this.playerInfoModal.style.display = 'flex';
+                this.updatePlayerInfo();
+                this.isPaused = true;
+            }
+        }
     }
     
     // Método para ocultar as informações do jogador
     hidePlayerInfo() {
         this.isPlayerInfoVisible = false;
-        this.playerInfoModal.style.display = 'none';
         
-        // Retoma o jogo quando a tela de informações é fechada
-        this.isPaused = false;
+        // Verifica se o playerInfoModal existe antes de acessar sua propriedade style
+        if (this.playerInfoModal) {
+            this.playerInfoModal.style.display = 'none';
+            
+            // Retoma o jogo quando a tela de informações é fechada
+            this.isPaused = false;
+        }
     }
     
     // Método para atualizar as informações do jogador no modal
     updatePlayerInfo() {
         const player = this.player;
         
+        // Verifica se o playerInfoModal existe antes de continuar
+        if (!this.playerInfoModal) {
+            console.error("playerInfoModal não encontrado em updatePlayerInfo!");
+            return;
+        }
+        
         // Atualiza os valores no modal
-        document.getElementById('infoLevel').textContent = player.level;
-        document.getElementById('infoHealth').textContent = `${player.health}/${player.maxHealth}`;
-        document.getElementById('infoXP').textContent = `${player.xp}/${player.xpToNextLevel}`;
-        document.getElementById('infoDamage').textContent = player.fireballDamage;
-        document.getElementById('infoSpeed').textContent = player.speed.toFixed(1);
+        const infoLevel = document.getElementById('infoLevel');
+        const infoHealth = document.getElementById('infoHealth');
+        const infoXP = document.getElementById('infoXP');
+        const infoDamage = document.getElementById('infoDamage');
+        const infoSpeed = document.getElementById('infoSpeed');
+        
+        if (infoLevel) infoLevel.textContent = player.level;
+        if (infoHealth) infoHealth.textContent = `${player.health}/${player.maxHealth}`;
+        if (infoXP) infoXP.textContent = `${player.xp}/${player.xpToNextLevel}`;
+        
+        // Atualiza o rótulo e valor do dano com base no poder atual
+        const damageLabel = this.playerInfoModal.querySelector('.info-row:nth-child(4) .info-label');
+        const currentPower = player.availablePowers.find(p => p.id === player.currentPower);
+        
+        if (damageLabel && currentPower) {
+            damageLabel.textContent = `${currentPower.name}:`;
+        }
+        
+        if (infoDamage) {
+            switch (player.currentPower) {
+                case 'fireball':
+                    infoDamage.textContent = player.fireballDamage;
+                    break;
+                case 'aoe':
+                    infoDamage.textContent = player.aoeDamage;
+                    break;
+                case 'ice':
+                    infoDamage.textContent = (player.iceDuration / 1000).toFixed(1) + 's';
+                    break;
+                case 'poison':
+                    infoDamage.textContent = player.poisonDamage.toFixed(1) + '/s';
+                    break;
+                case 'arrow':
+                    infoDamage.textContent = player.arrowDamage;
+                    break;
+                default:
+                    infoDamage.textContent = player.fireballDamage;
+            }
+        }
+        
+        if (infoSpeed) infoSpeed.textContent = player.speed.toFixed(1);
         
         // Atualiza o dano em área e mostra/oculta a linha com base no desbloqueio
         const aoeInfoRow = document.getElementById('aoeInfoRow');
-        if (player.currentPower === 'aoe') {
-            document.getElementById('infoAOEDamage').textContent = player.aoeDamage;
-            aoeInfoRow.style.display = 'flex';
-        } else {
-            aoeInfoRow.style.display = 'none';
+        if (aoeInfoRow) {
+            if (player.currentPower === 'aoe') {
+                const infoAOEDamage = document.getElementById('infoAOEDamage');
+                if (infoAOEDamage) infoAOEDamage.textContent = player.aoeDamage;
+                aoeInfoRow.style.display = 'flex';
+            } else {
+                aoeInfoRow.style.display = 'none';
+            }
+        }
+        
+        // Atualiza o dano do veneno e mostra/oculta a linha com base no desbloqueio
+        const iceInfoRow = document.getElementById('iceInfoRow');
+        if (iceInfoRow) {
+            if (player.currentPower === 'ice') {
+                const infoIceDuration = document.getElementById('infoIceDuration');
+                if (infoIceDuration) infoIceDuration.textContent = (player.iceDuration / 1000).toFixed(1) + 's';
+                iceInfoRow.style.display = 'flex';
+            } else if (player.currentPower === 'poison') {
+                // Renomeia a linha para exibir informações de veneno
+                const infoLabel = iceInfoRow.querySelector('.info-label');
+                if (infoLabel) infoLabel.textContent = 'Dano do Veneno:';
+                
+                const infoIceDuration = document.getElementById('infoIceDuration');
+                if (infoIceDuration) infoIceDuration.textContent = player.poisonDamage.toFixed(1) + '/s';
+                
+                iceInfoRow.style.display = 'flex';
+            } else {
+                iceInfoRow.style.display = 'none';
+            }
         }
     }
     
@@ -1334,48 +1349,60 @@ export class Game {
     // Método para criar o modal de informações do jogador
     createPlayerInfoModal() {
         // Verifica se o modal já existe no DOM
-        if (document.getElementById('playerInfoModal')) {
-            this.playerInfoModal = document.getElementById('playerInfoModal');
+        const existingModal = document.getElementById('playerInfoModal');
+        if (existingModal) {
+            this.playerInfoModal = existingModal;
+            
+            // Adiciona o event listener para o botão de fechar
+            const closeBtn = this.playerInfoModal.querySelector('#closeInfoBtn');
+            if (closeBtn) {
+                // Remove event listeners antigos para evitar duplicação
+                closeBtn.replaceWith(closeBtn.cloneNode(true));
+                // Adiciona o novo event listener
+                this.playerInfoModal.querySelector('#closeInfoBtn').addEventListener('click', () => {
+                    this.hidePlayerInfo();
+                });
+            }
             return;
         }
         
-        // Cria o modal de informações do jogador
+        // Cria o modal de informações do jogador apenas se não existir
         this.playerInfoModal = document.createElement('div');
         this.playerInfoModal.id = 'playerInfoModal';
-        this.playerInfoModal.className = 'modal';
+        this.playerInfoModal.className = 'modal-container'; // Usa a mesma classe do HTML
         this.playerInfoModal.style.display = 'none';
         
         // Conteúdo do modal
         this.playerInfoModal.innerHTML = `
             <div class="modal-content">
-                <h2>Informações do Jogador</h2>
-                <button id="closeInfoBtn" class="close-btn">×</button>
-                <div class="player-info">
+                <button id="closeInfoBtn" class="close-btn">X</button>
+                <h2 class="modal-title">Informações do Jogador</h2>
+                <div class="info-container">
                     <div class="info-row">
                         <span class="info-label">Nível:</span>
                         <span id="infoLevel" class="info-value">1</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">Vida:</span>
-                        <span id="infoHealth" class="info-value">50/50</span>
+                        <span id="infoHealth" class="info-value">100/100</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">Experiência:</span>
-                        <span id="infoXP" class="info-value">0/50</span>
+                        <span id="infoXP" class="info-value">0/100</span>
                     </div>
                     <div class="info-row">
-                        <span class="info-label">Dano:</span>
+                        <span class="info-label">Dano do Projétil:</span>
                         <span id="infoDamage" class="info-value">20</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">Velocidade:</span>
-                        <span id="infoSpeed" class="info-value">2.0</span>
+                        <span id="infoSpeed" class="info-value">5.0</span>
                     </div>
-                    <div id="aoeInfoRow" class="info-row">
+                    <div class="info-row" id="aoeInfoRow">
                         <span class="info-label">Dano em Área:</span>
                         <span id="infoAOEDamage" class="info-value">40</span>
                     </div>
-                    <div id="iceInfoRow" class="info-row">
+                    <div class="info-row" id="iceInfoRow">
                         <span class="info-label">Duração do Gelo:</span>
                         <span id="infoIceDuration" class="info-value">3.0s</span>
                     </div>
@@ -1386,9 +1413,12 @@ export class Game {
         document.body.appendChild(this.playerInfoModal);
         
         // Adiciona o event listener para o botão de fechar
-        document.getElementById('closeInfoBtn').addEventListener('click', () => {
-            this.hidePlayerInfo();
-        });
+        const closeBtn = this.playerInfoModal.querySelector('#closeInfoBtn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                this.hidePlayerInfo();
+            });
+        }
     }
     
     // Método para criar o modal de troca de poderes
@@ -2065,6 +2095,7 @@ export class Game {
             document.getElementById('iceCooldown').value = icePower ? icePower.maxCooldown : 2000;
             document.getElementById('iceDamage').value = this.player.fireballDamage * 0.7;
             document.getElementById('iceSize').value = this.player.iceSize;
+            document.getElementById('iceFreezeTime').value = this.player.iceDuration;
         }
         
         document.getElementById('aoeCooldown').value = this.player.aoeMaxCooldown;
@@ -2143,6 +2174,12 @@ export class Game {
         const iceSize = parseInt(document.getElementById('iceSize').value);
         if (!isNaN(iceSize)) {
             this.player.iceSize = iceSize;
+        }
+        
+        // Duração do congelamento
+        const iceFreezeTime = parseInt(document.getElementById('iceFreezeTime').value);
+        if (!isNaN(iceFreezeTime)) {
+            this.player.iceDuration = iceFreezeTime;
         }
         
         // AOE
@@ -2270,6 +2307,10 @@ export class Game {
                     this.player.fireballMaxCooldown = config.player.fireballMaxCooldown || this.player.fireballMaxCooldown;
                     this.player.fireballDamage = config.player.fireballDamage || this.player.fireballDamage;
                     this.player.fireballSize = config.player.fireballSize || this.player.fireballSize;
+                    
+                    // Configurações do gelo
+                    this.player.iceSize = config.player.iceSize || this.player.iceSize;
+                    this.player.iceDuration = config.player.iceDuration || this.player.iceDuration;
                     
                     this.player.aoeMaxCooldown = config.player.aoeMaxCooldown || this.player.aoeMaxCooldown;
                     this.player.aoeDamage = config.player.aoeDamage || this.player.aoeDamage;

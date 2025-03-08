@@ -209,11 +209,42 @@ export class EnemyProjectile extends Projectile {
         super(x, y, width, height, velocityX, velocityY, damage);
         this.isEnemy = true;
         this.lifespan = 2000; // Tempo de vida em ms
-        this.color = color || '#ff0000'; // Cor padrão vermelha
+        
+        // Cores de fogo para os projéteis inimigos
+        const fireColors = ['#ff3300', '#ff6600', '#ff9900', '#ffcc00']; // Vermelho, laranja, laranja claro, amarelo
+        this.color = fireColors[Math.floor(Math.random() * fireColors.length)]; // Escolhe uma cor aleatória
+        
         this.timeAlive = 0;
+        
+        // Adiciona propriedades para efeito de fogo
+        this.pulseRate = 0.1 + Math.random() * 0.2; // Taxa de pulsação
+        this.pulseAmount = 0.2 + Math.random() * 0.3; // Quantidade de pulsação
+        this.pulseOffset = Math.random() * Math.PI * 2; // Deslocamento da pulsação
+        
+        // Rastro de fogo
+        this.trail = [];
+        this.trailMaxLength = 10; // Número máximo de posições no rastro
     }
     
     update(deltaTime) {
+        // Salva a posição atual para o rastro
+        this.trail.push({
+            x: this.x + this.width / 2,
+            y: this.y + this.height / 2,
+            size: this.width / 2,
+            age: 0
+        });
+        
+        // Limita o tamanho do rastro
+        if (this.trail.length > this.trailMaxLength) {
+            this.trail.shift();
+        }
+        
+        // Atualiza a idade de cada ponto do rastro
+        for (const point of this.trail) {
+            point.age += deltaTime;
+        }
+        
         // Atualiza a posição
         this.x += this.velocityX;
         this.y += this.velocityY;
@@ -243,14 +274,22 @@ export class EnemyProjectile extends Projectile {
             }
         }
         
-        // Gera novas partículas
-        if (Math.random() < 0.3) {
+        // Gera novas partículas com mais frequência para efeito de fogo
+        if (Math.random() < 0.5) {
             this.addParticle();
         }
     }
     
     draw(ctx) {
-        // Desenha o projétil inimigo
+        // Desenha o rastro de fogo
+        this.drawTrail(ctx);
+        
+        // Calcula a pulsação para o efeito de fogo
+        const gameTime = performance.now();
+        const pulseFactor = 1 + Math.sin(gameTime * this.pulseRate + this.pulseOffset) * this.pulseAmount;
+        const size = (this.width / 2) * pulseFactor;
+        
+        // Desenha o projétil inimigo com efeito de fogo
         ctx.fillStyle = this.color;
         
         // Desenha um círculo
@@ -258,7 +297,7 @@ export class EnemyProjectile extends Projectile {
         ctx.arc(
             this.x + this.width / 2, 
             this.y + this.height / 2, 
-            this.width / 2, 
+            size, 
             0, 
             Math.PI * 2
         );
@@ -271,7 +310,7 @@ export class EnemyProjectile extends Projectile {
             0,
             this.x + this.width / 2, 
             this.y + this.height / 2, 
-            this.width / 2
+            size
         );
         
         gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
@@ -306,7 +345,7 @@ export class EnemyProjectile extends Projectile {
         ctx.arc(
             this.x + this.width / 2, 
             this.y + this.height / 2, 
-            this.width / 2, 
+            size, 
             0, 
             Math.PI * 2
         );
@@ -316,23 +355,51 @@ export class EnemyProjectile extends Projectile {
         this.drawParticles(ctx);
     }
     
+    // Método para desenhar o rastro de fogo
+    drawTrail(ctx) {
+        for (let i = 0; i < this.trail.length; i++) {
+            const point = this.trail[i];
+            const age = point.age / 200; // Normaliza a idade (0 a 1)
+            const opacity = Math.max(0, 1 - age); // Opacidade diminui com a idade
+            const size = point.size * (1 - age * 0.7); // Tamanho diminui com a idade
+            
+            // Escolhe a cor com base na idade (vai de amarelo para laranja para vermelho)
+            let trailColor;
+            if (age < 0.3) {
+                trailColor = `rgba(255, 255, 0, ${opacity})`; // Amarelo
+            } else if (age < 0.6) {
+                trailColor = `rgba(255, 165, 0, ${opacity})`; // Laranja
+            } else {
+                trailColor = `rgba(255, 0, 0, ${opacity})`; // Vermelho
+            }
+            
+            ctx.fillStyle = trailColor;
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    
     generateParticles() {
         // Gera partículas iniciais
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 10; i++) { // Aumenta o número de partículas iniciais
             this.addParticle();
         }
     }
     
     addParticle() {
-        // Adiciona uma nova partícula
+        // Cores de fogo para as partículas
+        const fireColors = ['#ff3300', '#ff6600', '#ff9900', '#ffcc00', '#ffff00'];
+        const particleColor = fireColors[Math.floor(Math.random() * fireColors.length)];
+        
         this.particles.push({
             x: this.x + this.width / 2,
             y: this.y + this.height / 2,
-            size: 1 + Math.random() * 2,
-            vx: (Math.random() - 0.5) * 1.5,
-            vy: (Math.random() - 0.5) * 1.5,
-            life: 50 + Math.random() * 100,
-            color: this.color
+            size: 1 + Math.random() * 3,
+            color: particleColor,
+            vx: (Math.random() - 0.5) * 2,
+            vy: (Math.random() - 0.5) * 2,
+            life: 300 + Math.random() * 200
         });
     }
 }
