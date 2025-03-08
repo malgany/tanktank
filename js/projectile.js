@@ -7,6 +7,7 @@ export class Projectile {
         this.velocityX = velocityX;
         this.velocityY = velocityY;
         this.damage = damage;
+        this.isEnemy = false; // Por padrão, projéteis não são de inimigos
         
         // Efeitos visuais
         this.particles = [];
@@ -28,23 +29,39 @@ export class Projectile {
             // Verifica colisão com as bordas do canvas
             const canvas = document.getElementById('gameCanvas');
             
-            // Ricochete na borda esquerda ou direita
-            if (this.x <= 0 || this.x + this.width >= canvas.width) {
-                this.velocityX = -this.velocityX; // Inverte a velocidade horizontal
+            // Ricochete na borda esquerda
+            if (this.x <= 0) {
+                this.x = 0; // Corrige a posição para evitar que saia da tela
+                this.velocityX = Math.abs(this.velocityX); // Garante que a velocidade seja positiva (para a direita)
                 this.ricochetsLeft--;
                 this.hasRicocheted = true;
-                
-                // Adiciona efeito visual de ricochete
                 this.addRicochetEffect();
             }
             
-            // Ricochete na borda superior ou inferior
-            if (this.y <= 0 || this.y + this.height >= canvas.height) {
-                this.velocityY = -this.velocityY; // Inverte a velocidade vertical
+            // Ricochete na borda direita
+            if (this.x + this.width >= canvas.width) {
+                this.x = canvas.width - this.width; // Corrige a posição
+                this.velocityX = -Math.abs(this.velocityX); // Garante que a velocidade seja negativa (para a esquerda)
                 this.ricochetsLeft--;
                 this.hasRicocheted = true;
-                
-                // Adiciona efeito visual de ricochete
+                this.addRicochetEffect();
+            }
+            
+            // Ricochete na borda superior
+            if (this.y <= 0) {
+                this.y = 0; // Corrige a posição
+                this.velocityY = Math.abs(this.velocityY); // Garante que a velocidade seja positiva (para baixo)
+                this.ricochetsLeft--;
+                this.hasRicocheted = true;
+                this.addRicochetEffect();
+            }
+            
+            // Ricochete na borda inferior
+            if (this.y + this.height >= canvas.height) {
+                this.y = canvas.height - this.height; // Corrige a posição
+                this.velocityY = -Math.abs(this.velocityY); // Garante que a velocidade seja negativa (para cima)
+                this.ricochetsLeft--;
+                this.hasRicocheted = true;
                 this.addRicochetEffect();
             }
         }
@@ -258,7 +275,31 @@ export class EnemyProjectile extends Projectile {
         );
         
         gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
-        gradient.addColorStop(1, `rgba(${parseInt(this.color.slice(1, 3), 16)}, ${parseInt(this.color.slice(3, 5), 16)}, ${parseInt(this.color.slice(5, 7), 16)}, 0)`);
+        
+        // Extrai os valores RGB da cor
+        let r, g, b;
+        if (this.color.startsWith('#')) {
+            // Se for uma cor hexadecimal
+            r = parseInt(this.color.slice(1, 3), 16);
+            g = parseInt(this.color.slice(3, 5), 16);
+            b = parseInt(this.color.slice(5, 7), 16);
+        } else if (this.color.startsWith('rgb')) {
+            // Se for uma cor RGB
+            const rgbValues = this.color.match(/\d+/g);
+            if (rgbValues && rgbValues.length >= 3) {
+                r = parseInt(rgbValues[0]);
+                g = parseInt(rgbValues[1]);
+                b = parseInt(rgbValues[2]);
+            } else {
+                // Fallback para vermelho se não conseguir extrair os valores
+                r = 255; g = 0; b = 0;
+            }
+        } else {
+            // Fallback para vermelho
+            r = 255; g = 0; b = 0;
+        }
+        
+        gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
         
         ctx.fillStyle = gradient;
         ctx.beginPath();

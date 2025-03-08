@@ -11,6 +11,12 @@
         <div class="game-area">
             <canvas id="gameCanvas"></canvas>
             <div class="map-position" id="mapPosition">[25, 25]</div>
+            
+            <!-- Game Over Overlay -->
+            <div id="gameOverOverlay" class="game-over-overlay">
+                <div class="game-over-text">GAME OVER</div>
+                <button id="restartButton" class="restart-button">Reiniciar Jogo</button>
+            </div>
         </div>
         
         <!-- Mapa completo (oculto por padrão) -->
@@ -83,21 +89,15 @@
             <div class="hud-skills">
                 <!-- Container de poderes -->
                 <div class="powers-container">
-                    <div class="power fireball-power selected" data-power-id="fireball">
+                    <!-- Slot único para poder -->
+                    <div class="power" id="power-slot" data-power-id="fireball">
                         <div class="power-icon">🔥</div>
                         <div class="cooldown-bar">
-                            <div id="fireballCooldown" class="cooldown"></div>
+                            <div id="powerCooldown" class="cooldown"></div>
+                            <div id="cooldownText" class="cooldown-text"></div>
                         </div>
-                        <div class="power-key">1</div>
+                        <div class="power-name" id="powerName">Tiro de Canhão</div>
                     </div>
-                    <div class="power aoe-power" style="display: none;" data-power-id="aoe">
-                        <div class="power-icon">💥</div>
-                        <div class="cooldown-bar">
-                            <div id="aoeCooldown" class="cooldown"></div>
-                        </div>
-                        <div class="power-key">2</div>
-                    </div>
-                    <!-- O poder de gelo será adicionado dinamicamente pelo JS -->
                 </div>
             </div>
         </div>

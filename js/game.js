@@ -19,6 +19,10 @@ export class Game {
             screenCount: this.world.screens.length
         });
         
+        // Define a posição inicial do jogador no meio do mapa [12,12]
+        this.currentScreenX = 12;
+        this.currentScreenY = 12;
+        
         this.player = new Player(this);
         this.ui = new UI(this);
         this.input = new InputHandler(this);
@@ -29,8 +33,8 @@ export class Game {
         this.drops = []; // Lista de drops de itens
         this.chests = []; // Lista de baús
         
-        this.currentScreenX = 12;
-        this.currentScreenY = 12;
+        // Estado do jogo
+        this.isPaused = false;
         
         // Obtém o tipo de terreno da tela inicial
         const initialScreenType = this.world.getScreenType(this.currentScreenX, this.currentScreenY);
@@ -113,38 +117,14 @@ export class Game {
                 screenName = 'Desconhecido';
         }
         
-        // Mostra a mensagem de zona inicial após um pequeno atraso
+        // Exibe mensagem de boas-vindas
+        this.ui.showMessage(`Bem-vindo à ${screenName}! Você está no centro do mapa [${this.currentScreenX}, ${this.currentScreenY}]`, 5000);
         setTimeout(() => {
-            this.ui.showMessage(`Zona ${this.currentZone + 1} - ${screenName}`, 3000);
-            
-            // Adiciona uma mensagem informativa sobre os controles
-            setTimeout(() => {
-                this.ui.showMessage("Controles: Clique para Tiro, Shift+Clique para Explosão, Ctrl+Clique para Gelo", 5000);
-            }, 3500);
-        }, 500);
+            this.ui.showMessage(`Use as teclas WASD para se mover. Vá até as bordas da tela para explorar outras áreas!`, 5000);
+        }, 5500);
         
         // Atualiza a exibição das coordenadas
         this.updateCoordinatesDisplay();
-        
-        // Lista de poderes
-        this.powersList = {
-            visible: false,
-            powers: [
-                { id: 'fireball', name: "Tiro de Canhão", description: "Dispara um projétil na direção do cursor", unlocked: true, icon: "🔥" },
-                { id: 'aoe', name: "Dano em Área", description: "Causa dano em uma área ao redor do ponto de impacto", unlocked: false, icon: "💥" },
-                { id: 'power3', name: "???", description: "Poder desconhecido", unlocked: false, icon: "?" },
-                { id: 'power4', name: "???", description: "Poder desconhecido", unlocked: false, icon: "?" },
-                { id: 'power5', name: "???", description: "Poder desconhecido", unlocked: false, icon: "?" }
-            ]
-        };
-        
-        // Criar o container da lista de poderes
-        this.createPowersListContainer();
-        
-        // Desativado temporariamente para evitar erros
-        // setTimeout(() => {
-        //     this.setupDragAndDrop();
-        // }, 100);
         
         window.addEventListener('resize', () => {
             this.setupCanvas();
@@ -174,9 +154,18 @@ export class Game {
         console.log("- debugGame.getCurrentPosition()");
         
         // Configuração de baús
-        this.chestSpawnChance = 0.3; // 30% de chance de aparecer um baú quando todos os inimigos são derrotados
+        this.chestSpawnChance = 0.8; // Aumentado para 80% de chance (era 30%)
         this.lastChestSpawnTime = 0;
-        this.minChestSpawnInterval = 60000; // Intervalo mínimo entre baús (1 minuto)
+        this.minChestSpawnInterval = 10000; // Reduzido para 10 segundos (era 60000 = 1 minuto)
+        
+        // Cria o modal de informações do jogador
+        this.createPlayerInfoModal();
+        
+        // Cria o modal de troca de poderes
+        this.createPowerSwapModal();
+        
+        // Sistema de alertas temporários
+        this.floatingAlerts = [];
         
         requestAnimationFrame(this.gameLoop.bind(this));
     }
@@ -190,6 +179,11 @@ export class Game {
     
     gameLoop(timestamp) {
         // Calcula o delta time
+        if (!this.lastTime) {
+            this.lastTime = timestamp;
+            this.gameTime = 0;
+        }
+        
         const deltaTime = timestamp - this.lastTime;
         this.lastTime = timestamp;
         this.gameTime += deltaTime;
@@ -200,40 +194,52 @@ export class Game {
         // Desenha o fundo
         this.drawBackground();
         
-        // Atualiza o jogador
-        this.player.update(deltaTime);
-        
-        // Verifica transição de tela
-        const transitionDirection = this.checkScreenTransition();
-        if (transitionDirection) {
-            console.log("Transição de tela:", transitionDirection);
+        // Atualiza apenas se o jogo não estiver pausado
+        if (!this.isPaused) {
+            // Atualiza o jogador
+            this.player.update(deltaTime);
+            
+            // Atualiza os inimigos
+            this.updateEnemies(deltaTime);
+            
+            // Atualiza os projéteis
+            this.updateProjectiles(deltaTime);
+            
+            // Atualiza os efeitos de AOE
+            this.updateAOEEffects(deltaTime);
+            
+            // Atualiza os drops
+            this.updateDrops(deltaTime);
+            
+            // Atualiza os baús
+            this.updateChests(deltaTime);
+            
+            // Verifica transição de tela e armazena o resultado
+            const transitionResult = this.checkScreenTransition();
+            
+            // Se houve transição, aplica as mudanças necessárias
+            if (transitionResult) {
+                console.log("Transição de tela detectada:", transitionResult);
+                
+                // Atualiza a UI após a transição
+                this.ui.update();
+                
+                // Atualiza as coordenadas
+                this.updateCoordinatesDisplay();
+            }
         }
         
-        // Atualiza e desenha os inimigos
-        this.updateEnemies(deltaTime);
-        
-        // Atualiza e desenha os projéteis
-        this.updateProjectiles(deltaTime);
-        
-        // Atualiza e desenha os efeitos de área
-        this.updateAOEEffects(deltaTime);
-        
-        // Atualiza e desenha os drops
-        this.updateDrops(deltaTime);
-        
-        // Atualiza e desenha os baús
-        this.updateChests(deltaTime);
-        
-        // Desenha o jogador (a atualização já foi feita no início)
+        // Desenha o jogador
         this.player.draw(this.ctx);
         
         // Atualiza a UI
         this.ui.update();
         
-        // Atualiza as informações do jogador no modal se estiver visível
-        if (this.isPlayerInfoVisible) {
-            this.updatePlayerInfo();
-        }
+        // Atualiza as coordenadas
+        this.updateCoordinatesDisplay();
+        
+        // Atualiza e desenha os alertas flutuantes
+        this.updateFloatingAlerts(deltaTime);
         
         // Continua o loop
         requestAnimationFrame(this.gameLoop.bind(this));
@@ -284,12 +290,18 @@ export class Game {
             
             // Verifica colisão com o jogador
             if (this.checkCollision(enemy, this.player)) {
-                // Calcula a direção do knockback (do inimigo para o jogador)
-                const knockbackX = this.player.x - enemy.x;
-                const knockbackY = this.player.y - enemy.y;
-                
-                // Aplica dano ao jogador com knockback reduzido
-                this.player.takeDamage(enemy.damage, knockbackX, knockbackY);
+                // Verifica se o inimigo não está em cooldown de colisão
+                if (enemy.collisionCooldown <= 0) {
+                    // Calcula a direção do knockback (do inimigo para o jogador)
+                    const knockbackX = this.player.x - enemy.x;
+                    const knockbackY = this.player.y - enemy.y;
+                    
+                    // Aplica dano ao jogador com knockback
+                    this.player.takeDamage(enemy.damage, knockbackX, knockbackY);
+                    
+                    // Aplica cooldown de colisão ao inimigo
+                    enemy.applyCollisionCooldown();
+                }
             }
             
             // Mantém o inimigo dentro da tela
@@ -297,11 +309,19 @@ export class Game {
         }
         
         // Verifica se todos os inimigos foram derrotados
-        if (this.enemies.length === 0 && !this.isScreenCleared(this.currentScreenX, this.currentScreenY)) {
-            this.markScreenAsCleared();
+        if (this.enemies.length === 0) {
+            console.log("Todos os inimigos foram derrotados!");
             
-            // Verifica se deve spawnar um baú
-            this.checkChestSpawn();
+            // Verifica se a tela já foi limpa antes
+            if (!this.isScreenCleared(this.currentScreenX, this.currentScreenY)) {
+                console.log("Marcando tela como limpa e verificando spawn de baú...");
+                this.markScreenAsCleared();
+                
+                // Verifica se deve spawnar um baú após limpar a tela
+                this.checkChestSpawn();
+            } else {
+                console.log("Tela já estava marcada como limpa anteriormente.");
+            }
         }
     }
     
@@ -333,29 +353,44 @@ export class Game {
                 continue;
             }
             
-            // Verifica colisão com inimigos
-            for (let j = this.enemies.length - 1; j >= 0; j--) {
-                const enemy = this.enemies[j];
+            // Verifica se é um projétil inimigo
+            if (projectile.isEnemy) {
+                // Log para depuração
+                // console.log("Processando projétil inimigo:", projectile);
                 
-                if (this.checkCollision(projectile, enemy)) {
-                    // Aplica dano ao inimigo
-                    enemy.takeDamage(projectile.damage);
+                // Verifica colisão com o jogador
+                if (this.checkCollision(projectile, this.player)) {
+                    console.log("Projétil inimigo atingiu o jogador!");
                     
-                    // Se for um projétil de gelo, aplica o efeito de lentidão ou congelamento
-                    if (projectile.type === 'ice') {
-                        // Verifica se o inimigo já está com efeito de gelo
-                        if (enemy.isSlowed) {
-                            // Se já está lento, congela
-                            this.player.freezeEnemy(enemy, 2000); // Congela por 2 segundos
-                        } else {
-                            // Se não está lento, diminui a velocidade
-                            this.player.slowEnemy(enemy, 0.5, 3000); // 50% da velocidade por 3 segundos
-                        }
-                    }
+                    // Aplica dano ao jogador
+                    this.player.takeDamage(projectile.damage);
                     
                     // Remove o projétil
                     this.projectiles.splice(i, 1);
-                    break;
+                    continue;
+                }
+            } else {
+                // Se não for um projétil inimigo, verifica colisão com inimigos
+                for (let j = this.enemies.length - 1; j >= 0; j--) {
+                    const enemy = this.enemies[j];
+                    
+                    if (this.checkCollision(projectile, enemy)) {
+                        // Log para depuração
+                        // console.log("Projétil do jogador atingiu inimigo:", enemy);
+                        
+                        // Aplica dano ao inimigo
+                        enemy.takeDamage(projectile.damage);
+                        
+                        // Se for um projétil de gelo, aplica o efeito de lentidão ou congelamento
+                        if (projectile.type === 'ice') {
+                            // Sempre congela o inimigo por 2 segundos no segundo tiro
+                            this.player.freezeEnemy(enemy, 2000); // Congela por 2 segundos
+                        }
+                        
+                        // Remove o projétil
+                        this.projectiles.splice(i, 1);
+                        break;
+                    }
                 }
             }
             
@@ -412,78 +447,81 @@ export class Game {
         let direction = '';
         
         // Verifica se o jogador saiu da tela
-        if (this.player.x < 0) {
-            // Verifica se está no deserto e se ainda há inimigos
-            if (this.world.getScreenType(this.currentScreenX, this.currentScreenY) === 'desert' && this.enemies.length > 0) {
-                // Impede a transição e mostra uma mensagem
-                this.player.x = 0;
-                this.ui.showMessage("Elimine todos os inimigos para avançar!", 2000);
-                return null;
-            }
-            
-            // Salva os inimigos da tela atual antes de transicionar
-            this.saveCurrentScreenEnemies();
-            
-            // Transição para a esquerda
-            this.currentScreenX--;
-            this.player.x = this.canvas.width - this.player.width;
-            transitioned = true;
-            direction = 'left';
-        } else if (this.player.x + this.player.width > this.canvas.width) {
-            // Verifica se está no deserto e se ainda há inimigos
-            if (this.world.getScreenType(this.currentScreenX, this.currentScreenY) === 'desert' && this.enemies.length > 0) {
-                // Impede a transição e mostra uma mensagem
+        console.log();
+        if (this.player.x <= 0) {
+            // Verifica se não está na borda do mundo
+            if (this.currentScreenX > 0) {
+                // Salva os inimigos da tela atual antes de transicionar
+                this.saveCurrentScreenEnemies();
+                
+                // Transição para a esquerda
+                this.currentScreenX--;
                 this.player.x = this.canvas.width - this.player.width;
-                this.ui.showMessage("Elimine todos os inimigos para avançar!", 2000);
-                return null;
+                transitioned = true;
+                direction = 'left';
+                console.log(`Transição para a esquerda. Nova posição: [${this.currentScreenX}, ${this.currentScreenY}]`);
+            } else {
+                // Impede o jogador de sair do mundo
+                this.player.x = 0;
+                this.ui.showMessage("Você atingiu o limite do mundo!", 2000);
             }
-            
-            // Salva os inimigos da tela atual antes de transicionar
-            this.saveCurrentScreenEnemies();
-            
-            // Transição para a direita
-            this.currentScreenX++;
-            this.player.x = 0;
-            transitioned = true;
-            direction = 'right';
-        } else if (this.player.y < 0) {
-            // Verifica se está no deserto e se ainda há inimigos
-            if (this.world.getScreenType(this.currentScreenX, this.currentScreenY) === 'desert' && this.enemies.length > 0) {
-                // Impede a transição e mostra uma mensagem
-                this.player.y = 0;
-                this.ui.showMessage("Elimine todos os inimigos para avançar!", 2000);
-                return null;
+        } else if (this.player.x + this.player.width >= this.canvas.width) {
+            // Verifica se não está na borda do mundo
+            if (this.currentScreenX < this.world.width - 1) {
+                // Salva os inimigos da tela atual antes de transicionar
+                this.saveCurrentScreenEnemies();
+                
+                // Transição para a direita
+                this.currentScreenX++;
+                this.player.x = 0;
+                transitioned = true;
+                direction = 'right';
+                console.log(`Transição para a direita. Nova posição: [${this.currentScreenX}, ${this.currentScreenY}]`);
+            } else {
+                // Impede o jogador de sair do mundo
+                this.player.x = this.canvas.width - this.player.width;
+                this.ui.showMessage("Você atingiu o limite do mundo!", 2000);
             }
-            
-            // Salva os inimigos da tela atual antes de transicionar
-            this.saveCurrentScreenEnemies();
-            
-            // Transição para cima
-            this.currentScreenY--;
-            this.player.y = this.canvas.height - this.player.height;
-            transitioned = true;
-            direction = 'up';
-        } else if (this.player.y + this.player.height > this.canvas.height) {
-            // Verifica se está no deserto e se ainda há inimigos
-            if (this.world.getScreenType(this.currentScreenX, this.currentScreenY) === 'desert' && this.enemies.length > 0) {
-                // Impede a transição e mostra uma mensagem
+        } else if (this.player.y <= 0) {
+            // Verifica se não está na borda do mundo
+            if (this.currentScreenY > 0) {
+                // Salva os inimigos da tela atual antes de transicionar
+                this.saveCurrentScreenEnemies();
+                
+                // Transição para cima
+                this.currentScreenY--;
                 this.player.y = this.canvas.height - this.player.height;
-                this.ui.showMessage("Elimine todos os inimigos para avançar!", 2000);
-                return null;
+                transitioned = true;
+                direction = 'up';
+                console.log(`Transição para cima. Nova posição: [${this.currentScreenX}, ${this.currentScreenY}]`);
+            } else {
+                // Impede o jogador de sair do mundo
+                this.player.y = 0;
+                this.ui.showMessage("Você atingiu o limite do mundo!", 2000);
             }
-            
-            // Salva os inimigos da tela atual antes de transicionar
-            this.saveCurrentScreenEnemies();
-            
-            // Transição para baixo
-            this.currentScreenY++;
-            this.player.y = 0;
-            transitioned = true;
-            direction = 'down';
+        } else if (this.player.y + this.player.height >= this.canvas.height) {
+            // Verifica se não está na borda do mundo
+            if (this.currentScreenY < this.world.height - 1) {
+                // Salva os inimigos da tela atual antes de transicionar
+                this.saveCurrentScreenEnemies();
+                
+                // Transição para baixo
+                this.currentScreenY++;
+                this.player.y = 0;
+                transitioned = true;
+                direction = 'down';
+                console.log(`Transição para baixo. Nova posição: [${this.currentScreenX}, ${this.currentScreenY}]`);
+            } else {
+                // Impede o jogador de sair do mundo
+                this.player.y = this.canvas.height - this.player.height;
+                this.ui.showMessage("Você atingiu o limite do mundo!", 2000);
+            }
         }
         
         // Se houve transição, atualiza a tela
         if (transitioned) {
+            console.log(`Transição de tela: ${direction}. Nova posição: [${this.currentScreenX}, ${this.currentScreenY}]`);
+            
             // Limita as coordenadas da tela ao tamanho do mundo
             this.currentScreenX = Math.max(0, Math.min(this.currentScreenX, this.world.width - 1));
             this.currentScreenY = Math.max(0, Math.min(this.currentScreenY, this.world.height - 1));
@@ -498,6 +536,7 @@ export class Game {
             // Limpa os inimigos atuais antes de carregar novos
             this.enemies = [];
             this.drops = [];
+            this.chests = []; // Limpa também os baús
             
             // Verifica se a tela já foi limpa de inimigos
             if (this.isScreenCleared(this.currentScreenX, this.currentScreenY)) {
@@ -516,6 +555,9 @@ export class Game {
                     this.generateEnemiesForCurrentScreen();
                 }
             }
+            
+            // Verifica se deve gerar um baú na nova tela
+            this.checkChestSpawn();
             
             // Atualiza a exibição das coordenadas
             this.updateCoordinatesDisplay();
@@ -561,7 +603,8 @@ export class Game {
             
             return {
                 newScreen: { x: this.currentScreenX, y: this.currentScreenY },
-                screenType: screenType
+                screenType: screenType,
+                direction: direction
             };
         }
         
@@ -651,8 +694,29 @@ export class Game {
     }
     
     updateCoordinatesDisplay() {
+        // Obtém o tipo de terreno da tela atual
+        const screenType = this.world.getScreenType(this.currentScreenX, this.currentScreenY);
+        let screenName = '';
+        
+        switch (screenType) {
+            case 'plains':
+                screenName = 'Planície';
+                break;
+            case 'forest':
+                screenName = 'Floresta';
+                break;
+            case 'mountains':
+                screenName = 'Montanhas';
+                break;
+            case 'desert':
+                screenName = 'Deserto';
+                break;
+            default:
+                screenName = 'Desconhecido';
+        }
+        
         // Atualiza a posição do mapa no canto superior esquerdo
-        document.getElementById('mapPosition').textContent = `[${this.currentScreenX}, ${this.currentScreenY}]`;
+        document.getElementById('mapPosition').textContent = `[${this.currentScreenX}, ${this.currentScreenY}] - ${screenName}`;
     }
     
     addProjectile(projectile) {
@@ -685,14 +749,20 @@ export class Game {
                     case 'speed':
                         this.player.speed += drop.value;
                         this.ui.showMessage(`Velocidade +${drop.value}!`, 2000);
+                        // Cria um alerta flutuante
+                        this.createFloatingAlert(`+${drop.value} VEL`, drop.x, drop.y - 20, '#00ff00');
                         break;
                     case 'damage':
                         this.player.fireballDamage += drop.value;
                         this.ui.showMessage(`Dano +${drop.value}!`, 2000);
+                        // Cria um alerta flutuante
+                        this.createFloatingAlert(`+${drop.value} DANO`, drop.x, drop.y - 20, '#ff9900');
                         break;
                     case 'health':
                         this.player.health = Math.min(this.player.health + drop.value, this.player.maxHealth);
                         this.ui.showMessage(`Vida +${drop.value}!`, 2000);
+                        // Cria um alerta flutuante
+                        this.createFloatingAlert(`+${drop.value} VIDA`, drop.x, drop.y - 20, '#ff0000');
                         break;
                 }
                 
@@ -709,10 +779,10 @@ export class Game {
                     this.ctx.fillStyle = '#00ff00'; // Verde para velocidade
                     break;
                 case 'damage':
-                    this.ctx.fillStyle = '#ff0000'; // Vermelho para dano
+                    this.ctx.fillStyle = '#000000'; // Preto para dano
                     break;
                 case 'health':
-                    this.ctx.fillStyle = '#0000ff'; // Azul para vida
+                    this.ctx.fillStyle = '#ff0000'; // Vermelho para vida
                     break;
             }
             
@@ -738,6 +808,9 @@ export class Game {
             this.ui.showMessage("Elimine todos os inimigos para avançar!", 2000);
             return null;
         }
+        
+        // Salva os inimigos da tela atual antes de transicionar
+        this.saveCurrentScreenEnemies();
         
         switch(direction) {
             case 'up':
@@ -767,9 +840,30 @@ export class Game {
         this.projectiles = [];
         this.aoeEffects = [];
         this.drops = [];
+        this.chests = []; // Limpa também os baús
         
-        // Gera novos elementos para a nova tela
-        this.generateEnemiesForCurrentScreen();
+        // Verifica se a tela já foi limpa de inimigos
+        if (this.isScreenCleared(this.currentScreenX, this.currentScreenY)) {
+            // Se a tela já foi limpa, não carrega inimigos
+            console.log("Tela já limpa:", this.currentScreenX, this.currentScreenY);
+        } else {
+            // Verifica se há inimigos salvos para esta tela
+            const screenKey = `${this.currentScreenX},${this.currentScreenY}`;
+            if (this.screenEnemies[screenKey]) {
+                // Carrega os inimigos salvos
+                console.log("Carregando inimigos salvos:", screenKey);
+                this.loadScreenEnemies(this.currentScreenX, this.currentScreenY);
+            } else {
+                // Gera novos inimigos para a tela
+                console.log("Gerando novos inimigos:", screenKey);
+                this.generateEnemiesForCurrentScreen();
+            }
+        }
+        
+        // Verifica se deve gerar um baú na nova tela
+        this.checkChestSpawn();
+        
+        // Atualiza a exibição das coordenadas
         this.updateCoordinatesDisplay();
         
         // Exibe uma mensagem informando a nova tela
@@ -813,237 +907,15 @@ export class Game {
         
         return {
             newScreen: { x: this.currentScreenX, y: this.currentScreenY },
-            screenType: screenType
+            screenType: screenType,
+            direction: direction
         };
-    }
-    
-    // Método para criar o container da lista de poderes
-    createPowersListContainer() {
-        // Criar o container principal
-        const powersContainer = document.createElement('div');
-        powersContainer.className = 'modal-container';
-        powersContainer.id = 'powersListContainer';
-        
-        // Criar o conteúdo do modal
-        const modalContent = document.createElement('div');
-        modalContent.className = 'modal-content powers-content';
-        powersContainer.appendChild(modalContent);
-        
-        // Adicionar botão de fechar
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'close-btn';
-        closeBtn.textContent = 'X';
-        closeBtn.addEventListener('click', () => {
-            // Garantir que o modal seja fechado corretamente
-            this.powersList.visible = false;
-            this.powersListContainer.style.display = 'none';
-            
-            // Desabilitar arrastar nos itens da barra de poderes
-            const skills = document.querySelectorAll('.skill');
-            skills.forEach(skill => {
-                skill.draggable = false;
-            });
-        });
-        modalContent.appendChild(closeBtn);
-        
-        // Adicionar título
-        const title = document.createElement('h2');
-        title.className = 'modal-title';
-        title.textContent = 'Poderes';
-        modalContent.appendChild(title);
-        
-        // Criar a grade de poderes
-        const powersGrid = document.createElement('div');
-        powersGrid.className = 'powers-grid';
-        
-        // Adicionar cada poder à grade
-        this.powersList.powers.forEach(power => {
-            const powerItem = document.createElement('div');
-            powerItem.className = `power-item ${power.unlocked ? '' : 'disabled'}`;
-            powerItem.dataset.powerId = power.id;
-            
-            if (power.unlocked) {
-                powerItem.draggable = true;
-                powerItem.addEventListener('dragstart', this.handleDragStart.bind(this));
-                powerItem.addEventListener('dragend', this.handleDragEnd.bind(this));
-            }
-            
-            const powerIcon = document.createElement('div');
-            powerIcon.className = 'power-icon';
-            powerIcon.textContent = power.icon;
-            
-            const powerInfo = document.createElement('div');
-            powerInfo.className = 'power-info';
-            
-            const powerName = document.createElement('div');
-            powerName.className = 'power-name';
-            powerName.textContent = power.name;
-            
-            const powerDesc = document.createElement('div');
-            powerDesc.className = 'power-description';
-            powerDesc.textContent = power.description;
-            
-            powerInfo.appendChild(powerName);
-            powerInfo.appendChild(powerDesc);
-            
-            powerItem.appendChild(powerIcon);
-            powerItem.appendChild(powerInfo);
-            
-            powersGrid.appendChild(powerItem);
-        });
-        
-        modalContent.appendChild(powersGrid);
-        
-        // Adicionar ao DOM
-        document.body.appendChild(powersContainer);
-        
-        // Salvar referência
-        this.powersListContainer = powersContainer;
-    }
-    
-    // Configurar o sistema de arrastar e soltar
-    setupDragAndDrop() {
-        // Verificar se o container de poderes existe
-        const powersContainer = document.querySelector('.powers-container');
-        if (!powersContainer) {
-            console.warn('Container de poderes não encontrado. O sistema de arrastar e soltar não será configurado.');
-            return;
-        }
-        
-        // Adicionar eventos para os poderes na barra
-        const powers = powersContainer.querySelectorAll('.power');
-        powers.forEach(power => {
-            // Verificar se o poder já tem os eventos
-            if (!power.hasEventListeners) {
-                power.addEventListener('dragover', this.handleDragOver.bind(this));
-                power.addEventListener('dragleave', this.handleDragLeave.bind(this));
-                power.addEventListener('drop', this.handleDrop.bind(this));
-                power.hasEventListeners = true;
-            }
-        });
-    }
-    
-    // Manipuladores de eventos de arrastar e soltar
-    handleDragStart(e) {
-        e.dataTransfer.setData('text/plain', e.target.dataset.powerId);
-        e.target.classList.add('dragging');
-    }
-    
-    handleDragEnd(e) {
-        e.target.classList.remove('dragging');
-    }
-    
-    handleDragOver(e) {
-        e.preventDefault();
-        e.currentTarget.classList.add('drag-over');
-    }
-    
-    handleDragLeave(e) {
-        e.currentTarget.classList.remove('drag-over');
-    }
-    
-    handleDrop(e) {
-        e.preventDefault();
-        const powerId = e.dataTransfer.getData('text/plain');
-        const targetPower = e.currentTarget;
-        
-        targetPower.classList.remove('drag-over');
-        
-        // Obter o ID do poder alvo usando o atributo data-power-id
-        const targetPowerId = targetPower.getAttribute('data-power-id');
-        if (!targetPowerId) {
-            console.warn('Elemento de poder alvo não tem o atributo data-power-id.');
-            return;
-        }
-        
-        // Trocar o poder no slot
-        this.swapPower(powerId, targetPowerId);
-    }
-    
-    // Trocar um poder no slot
-    swapPower(powerId, targetPowerId) {
-        // Encontrar o poder na lista
-        const power = this.powersList.powers.find(p => p.id === powerId);
-        if (!power || !power.unlocked) return;
-        
-        // Encontrar o poder na barra (usando o atributo data-power-id)
-        const targetPowerElement = document.querySelector(`.power[data-power-id="${targetPowerId}"]`);
-        if (!targetPowerElement) {
-            console.warn(`Elemento de poder com data-power-id="${targetPowerId}" não encontrado.`);
-            return;
-        }
-        
-        // Verificar se o poder já está em outro slot
-        const existingPowerElement = document.querySelector(`.power[data-power-id="${powerId}"]`);
-        
-        // Se o poder já está em outro slot, trocar os poderes
-        if (existingPowerElement && existingPowerElement !== targetPowerElement) {
-            // Trocar os IDs
-            existingPowerElement.setAttribute('data-power-id', targetPowerId);
-            targetPowerElement.setAttribute('data-power-id', powerId);
-            
-            // Trocar os ícones
-            const existingIconElement = existingPowerElement.querySelector('.power-icon');
-            const targetIconElement = targetPowerElement.querySelector('.power-icon');
-            
-            const tempIcon = existingIconElement.textContent;
-            existingIconElement.textContent = targetIconElement.textContent;
-            targetIconElement.textContent = tempIcon;
-            
-            // Trocar as classes
-            existingPowerElement.classList.remove('fireball-power', 'aoe-power', 'ice-power');
-            targetPowerElement.classList.remove('fireball-power', 'aoe-power', 'ice-power');
-            
-            if (powerId === 'fireball') {
-                targetPowerElement.classList.add('fireball-power');
-            } else if (powerId === 'aoe') {
-                targetPowerElement.classList.add('aoe-power');
-            } else if (powerId === 'ice') {
-                targetPowerElement.classList.add('ice-power');
-            }
-            
-            if (targetPowerId === 'fireball') {
-                existingPowerElement.classList.add('fireball-power');
-            } else if (targetPowerId === 'aoe') {
-                existingPowerElement.classList.add('aoe-power');
-            } else if (targetPowerId === 'ice') {
-                existingPowerElement.classList.add('ice-power');
-            }
-        }
-        
-        // Mostrar mensagem
-        this.ui.showMessage(`Poder "${power.name}" equipado!`, 1500);
     }
     
     // Método para mostrar/ocultar a lista de poderes
     togglePowersList() {
-        // Verifica se outros modais estão abertos e os fecha
-        if (this.isFullMapVisible) {
-            this.hideFullMap();
-        }
-        if (this.isPlayerInfoVisible) {
-            this.hidePlayerInfo();
-        }
-        
-        this.powersList.visible = !this.powersList.visible;
-        
-        if (this.powersList.visible) {
-            this.powersListContainer.style.display = 'flex';
-            
-            // Habilitar arrastar nos itens da barra de poderes
-            const skills = document.querySelectorAll('.skill');
-            skills.forEach(skill => {
-                skill.draggable = true;
-            });
-        } else {
-            this.powersListContainer.style.display = 'none';
-            
-            // Desabilitar arrastar nos itens da barra de poderes
-            const skills = document.querySelectorAll('.skill');
-            skills.forEach(skill => {
-                skill.draggable = false;
-            });
-        }
+        // Método removido - não é mais necessário com o novo sistema de poderes
+        this.ui.showMessage("Sistema de poderes atualizado!", 2000);
     }
     
     // Método para mostrar o mapa completo
@@ -1080,12 +952,18 @@ export class Game {
         this.isPlayerInfoVisible = true;
         this.playerInfoModal.style.display = 'flex';
         this.updatePlayerInfo();
+        
+        // Pausa o jogo enquanto a tela de informações está aberta
+        this.isPaused = true;
     }
     
     // Método para ocultar as informações do jogador
     hidePlayerInfo() {
         this.isPlayerInfoVisible = false;
         this.playerInfoModal.style.display = 'none';
+        
+        // Retoma o jogo quando a tela de informações é fechada
+        this.isPaused = false;
     }
     
     // Método para atualizar as informações do jogador no modal
@@ -1101,7 +979,7 @@ export class Game {
         
         // Atualiza o dano em área e mostra/oculta a linha com base no desbloqueio
         const aoeInfoRow = document.getElementById('aoeInfoRow');
-        if (player.aoeUnlocked) {
+        if (player.currentPower === 'aoe') {
             document.getElementById('infoAOEDamage').textContent = player.aoeDamage;
             aoeInfoRow.style.display = 'flex';
         } else {
@@ -1281,6 +1159,11 @@ export class Game {
     markScreenAsCleared() {
         const screenKey = `${this.currentScreenX},${this.currentScreenY}`;
         this.clearedScreens[screenKey] = true;
+        
+        console.log(`Tela ${screenKey} marcada como limpa de inimigos.`);
+        
+        // Força a verificação de spawn de baú
+        this.checkChestSpawn();
     }
     
     // Verifica se a tela está limpa de inimigos
@@ -1358,7 +1241,7 @@ export class Game {
     
     // Método para desenhar a lista de poderes (não é mais necessário, agora é HTML)
     drawPowersList() {
-        // Método mantido para compatibilidade, mas não faz nada
+        // Método removido - não é mais necessário com o novo sistema de poderes
     }
     
     // Método para desenhar o fundo da tela atual
@@ -1369,25 +1252,23 @@ export class Game {
     
     // Método para verificar se deve spawnar um baú
     checkChestSpawn() {
-        const currentTime = this.gameTime;
+        // Chance de 30% de spawnar um baú após matar todos os inimigos
+        const randomValue = Math.random();
         
-        // Verifica se passou tempo suficiente desde o último baú
-        if (currentTime - this.lastChestSpawnTime >= this.minChestSpawnInterval) {
-            // Chance de spawnar um baú
-            if (Math.random() < this.chestSpawnChance) {
-                // Spawna um baú no centro da tela
-                const x = this.canvas.width / 2;
-                const y = this.canvas.height / 2;
-                
-                const chest = new Chest(x, y, this);
-                this.chests.push(chest);
-                
-                // Atualiza o tempo do último baú
-                this.lastChestSpawnTime = currentTime;
-                
-                // Mostra uma mensagem
-                this.ui.showMessage("Um baú misterioso apareceu!", 3000);
-            }
+        if (randomValue < 0.3) {
+            console.log("Baú gerado após eliminar todos os inimigos!");
+            
+            // Spawna um baú em uma posição aleatória na tela (não muito perto das bordas)
+            const margin = 100; // Margem para evitar que o baú fique muito perto das bordas
+            const x = margin + Math.random() * (this.canvas.width - 2 * margin);
+            const y = margin + Math.random() * (this.canvas.height - 2 * margin);
+            
+            // Cria o baú
+            const chest = new Chest(x, y, this);
+            this.chests.push(chest);
+            
+            // Atualiza o tempo do último spawn
+            this.lastChestSpawnTime = this.gameTime;
         }
     }
     
@@ -1406,6 +1287,238 @@ export class Game {
             if (chest.collected) {
                 this.chests.splice(i, 1);
             }
+        }
+    }
+    
+    // Método para forçar a geração de um baú
+    forceChestSpawn() {
+        // Spawna um baú em uma posição aleatória na tela (não muito perto das bordas)
+        const margin = 100; // Margem para evitar que o baú fique muito perto das bordas
+        const x = margin + Math.random() * (this.canvas.width - 2 * margin);
+        const y = margin + Math.random() * (this.canvas.height - 2 * margin);
+        
+        const chest = new Chest(x, y, this);
+        this.chests.push(chest);
+        
+        // Atualiza o tempo do último baú
+        this.lastChestSpawnTime = this.gameTime;
+        
+        // Mostra uma mensagem
+        this.ui.showMessage("Um baú misterioso apareceu!", 3000);
+        console.log("Baú gerado com sucesso (forçado)!");
+    }
+    
+    // Método para criar o modal de informações do jogador
+    createPlayerInfoModal() {
+        // Verifica se o modal já existe no DOM
+        if (document.getElementById('playerInfoModal')) {
+            this.playerInfoModal = document.getElementById('playerInfoModal');
+            return;
+        }
+        
+        // Cria o modal de informações do jogador
+        this.playerInfoModal = document.createElement('div');
+        this.playerInfoModal.id = 'playerInfoModal';
+        this.playerInfoModal.className = 'modal';
+        this.playerInfoModal.style.display = 'none';
+        
+        // Conteúdo do modal
+        this.playerInfoModal.innerHTML = `
+            <div class="modal-content">
+                <h2>Informações do Jogador</h2>
+                <button id="closeInfoBtn" class="close-btn">×</button>
+                <div class="player-info">
+                    <div class="info-row">
+                        <span class="info-label">Nível:</span>
+                        <span id="infoLevel" class="info-value">1</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Vida:</span>
+                        <span id="infoHealth" class="info-value">50/50</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Experiência:</span>
+                        <span id="infoXP" class="info-value">0/50</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Dano:</span>
+                        <span id="infoDamage" class="info-value">20</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Velocidade:</span>
+                        <span id="infoSpeed" class="info-value">2.0</span>
+                    </div>
+                    <div id="aoeInfoRow" class="info-row">
+                        <span class="info-label">Dano em Área:</span>
+                        <span id="infoAOEDamage" class="info-value">40</span>
+                    </div>
+                    <div id="iceInfoRow" class="info-row">
+                        <span class="info-label">Duração do Gelo:</span>
+                        <span id="infoIceDuration" class="info-value">3.0s</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(this.playerInfoModal);
+        
+        // Adiciona o event listener para o botão de fechar
+        document.getElementById('closeInfoBtn').addEventListener('click', () => {
+            this.hidePlayerInfo();
+        });
+    }
+    
+    // Método para criar o modal de troca de poderes
+    createPowerSwapModal() {
+        // Cria o modal de troca de poderes
+        this.powerSwapModal = document.createElement('div');
+        this.powerSwapModal.id = 'powerSwapModal';
+        this.powerSwapModal.className = 'modal';
+        this.powerSwapModal.style.display = 'none';
+        
+        // Conteúdo do modal
+        this.powerSwapModal.innerHTML = `
+            <div class="modal-content">
+                <h2>Trocar Poder?</h2>
+                <div class="power-comparison">
+                    <div class="current-power">
+                        <h3>Poder Atual</h3>
+                        <div id="currentPowerIcon" class="power-icon"></div>
+                        <div id="currentPowerName" class="power-name"></div>
+                    </div>
+                    <div class="swap-arrow">⟷</div>
+                    <div class="new-power">
+                        <h3>Novo Poder</h3>
+                        <div id="newPowerIcon" class="power-icon"></div>
+                        <div id="newPowerName" class="power-name"></div>
+                    </div>
+                </div>
+                <div class="power-description" id="newPowerDescription"></div>
+                <div class="modal-buttons">
+                    <button id="confirmSwapBtn">Trocar</button>
+                    <button id="cancelSwapBtn">Manter Atual</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(this.powerSwapModal);
+        
+        // Adiciona os event listeners para os botões
+        document.getElementById('confirmSwapBtn').addEventListener('click', () => {
+            this.confirmPowerSwap();
+        });
+        
+        document.getElementById('cancelSwapBtn').addEventListener('click', () => {
+            this.cancelPowerSwap();
+        });
+    }
+    
+    // Método para mostrar o modal de troca de poderes
+    showPowerSwapModal(newPowerId) {
+        this.isPaused = true;
+        this.newPowerToSwap = newPowerId;
+        
+        // Exibe o modal
+        this.powerSwapModal.style.display = 'flex';
+        
+        // Atualiza as informações no modal
+        const currentPower = this.player.availablePowers.find(p => p.id === this.player.currentPower);
+        const newPower = this.player.availablePowers.find(p => p.id === newPowerId);
+        
+        document.getElementById('currentPowerIcon').textContent = currentPower.icon;
+        document.getElementById('currentPowerName').textContent = currentPower.name;
+        
+        document.getElementById('newPowerIcon').textContent = newPower.icon;
+        document.getElementById('newPowerName').textContent = newPower.name;
+        document.getElementById('newPowerDescription').textContent = newPower.description;
+        
+        // Adiciona classes específicas para estilização
+        document.getElementById('currentPowerIcon').className = 'power-icon';
+        document.getElementById('currentPowerIcon').classList.add(`${currentPower.id}-power`);
+        
+        document.getElementById('newPowerIcon').className = 'power-icon';
+        document.getElementById('newPowerIcon').classList.add(`${newPower.id}-power`);
+    }
+    
+    // Método para confirmar a troca de poder
+    confirmPowerSwap() {
+        // Troca para o novo poder
+        this.player.changePower(this.newPowerToSwap);
+        
+        // Exibe mensagem de confirmação
+        this.ui.showMessage(`Poder alterado para: ${this.player.getPowerName(this.newPowerToSwap)}`, 2000);
+        
+        // Fecha o modal e retoma o jogo
+        this.powerSwapModal.style.display = 'none';
+        this.isPaused = false;
+        this.newPowerToSwap = null;
+    }
+    
+    // Método para cancelar a troca de poder
+    cancelPowerSwap() {
+        // Exibe mensagem de cancelamento
+        this.ui.showMessage(`Você manteve o poder: ${this.player.getPowerName(this.player.currentPower)}`, 2000);
+        
+        // Fecha o modal e retoma o jogo
+        this.powerSwapModal.style.display = 'none';
+        this.isPaused = false;
+        this.newPowerToSwap = null;
+    }
+    
+    // Método para criar um alerta flutuante
+    createFloatingAlert(text, x, y, color = '#FFFFFF') {
+        this.floatingAlerts.push({
+            text: text,
+            x: x,
+            y: y,
+            color: color,
+            alpha: 1,
+            scale: 0,
+            maxScale: 1.2,
+            scaleSpeed: 0.1,
+            fadeSpeed: 0.03,
+            createdAt: this.gameTime,
+            lifetime: 800 // Duração total em ms
+        });
+    }
+    
+    // Método para atualizar e desenhar os alertas flutuantes
+    updateFloatingAlerts(deltaTime) {
+        for (let i = this.floatingAlerts.length - 1; i >= 0; i--) {
+            const alert = this.floatingAlerts[i];
+            
+            // Calcula o tempo de vida
+            const elapsedTime = this.gameTime - alert.createdAt;
+            
+            // Remove alertas expirados
+            if (elapsedTime >= alert.lifetime) {
+                this.floatingAlerts.splice(i, 1);
+                continue;
+            }
+            
+            // Atualiza a escala (crescimento rápido no início)
+            if (alert.scale < alert.maxScale) {
+                alert.scale += alert.scaleSpeed;
+            }
+            
+            // Atualiza a opacidade (fade out gradual)
+            if (elapsedTime > alert.lifetime * 0.5) {
+                alert.alpha -= alert.fadeSpeed;
+                if (alert.alpha < 0) alert.alpha = 0;
+            }
+            
+            // Move o alerta para cima lentamente
+            alert.y -= 0.5;
+            
+            // Desenha o alerta
+            this.ctx.save();
+            this.ctx.globalAlpha = alert.alpha;
+            this.ctx.font = `bold ${16 * alert.scale}px Arial`;
+            this.ctx.fillStyle = alert.color;
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText(alert.text, alert.x, alert.y);
+            this.ctx.restore();
         }
     }
 } 

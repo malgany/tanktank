@@ -9,6 +9,8 @@ export class Player {
         // Posição e dimensões
         this.width = 30;
         this.height = 40; // Um pouco mais comprido para parecer um tanque
+        
+        // Posiciona o jogador no centro da tela
         this.x = game.canvas.width / 2 - this.width / 2;
         this.y = game.canvas.height / 2 - this.height / 2;
         
@@ -38,7 +40,16 @@ export class Player {
         this.aoeDamage = 40;
         this.aoeCooldown = 0;
         this.aoeMaxCooldown = 10000; // 10 segundos
-        this.aoeUnlocked = false;
+        
+        // Habilidade de gelo
+        this.iceDamage = 15;
+        this.iceCooldown = 0;
+        this.iceMaxCooldown = 2000; // 2 segundos
+        
+        // Tamanho dos projéteis (aumenta quando coleta o mesmo poder)
+        this.fireballSize = 10; // Tamanho inicial
+        this.iceSize = 10; // Tamanho inicial
+        this.aoeSize = 80; // Raio inicial
         
         // Direção atual (para o disparo)
         this.direction = 'right'; // 'up', 'right', 'down', 'left'
@@ -55,34 +66,48 @@ export class Player {
         // Novos poderes e melhorias
         this.powerMultiplier = 1; // Multiplicador de poderes (item +1)
         this.hasRicochet = false; // Se tem a habilidade de ricochete
-        this.hasIcePower = false; // Se tem o poder de gelo
-        this.iceCooldown = 0;
-        this.iceMaxCooldown = 2000; // 2 segundos
         
         // Sistema de congelamento de inimigos
         this.frozenEnemies = {}; // Armazena os inimigos congelados e seus tempos
         
-        // Lista de poderes disponíveis
-        this.powers = [
+        // Sistema de redução de cooldown
+        this.cooldownMultiplier = 1; // Multiplicador de cooldown (1 = normal, < 1 = reduzido)
+        this.cooldownReductionEndTime = 0; // Tempo em que o efeito de redução de cooldown termina
+        
+        // Configuração dos poderes disponíveis
+        this.availablePowers = [
             {
                 id: 'fireball',
-                name: 'Bola de Fogo',
+                name: 'Tiro de Canhão',
                 description: 'Dispara uma bola de fogo na direção do cursor',
+                icon: '🔥',
                 cooldown: 0,
                 maxCooldown: this.fireballMaxCooldown
             },
             {
-                id: 'aoe',
-                name: 'Explosão',
-                description: 'Cria uma explosão que causa dano em área',
+                id: 'ice',
+                name: 'Gelo',
+                description: 'Dispara um projétil de gelo que congela os inimigos',
+                icon: '❄️',
                 cooldown: 0,
-                maxCooldown: this.aoeMaxCooldown,
-                unlocked: this.aoeUnlocked
+                maxCooldown: 2000
+            },
+            {
+                id: 'aoe',
+                name: 'Ataque em Área',
+                description: 'Cria uma explosão que causa dano em área',
+                icon: '💥',
+                cooldown: 0,
+                maxCooldown: this.aoeMaxCooldown
             }
         ];
         
-        // Poder selecionado atualmente
-        this.selectedPower = 'fireball';
+        // Seleciona um poder aleatório inicial
+        const randomPowerIndex = Math.floor(Math.random() * 3);
+        this.currentPower = this.availablePowers[randomPowerIndex].id;
+        
+        // Atualiza o slot de poder na UI com o poder inicial
+        this.updatePowerSlotUI();
     }
     
     update(deltaTime) {
@@ -100,89 +125,93 @@ export class Player {
             this.x = Math.max(0, Math.min(this.x, this.game.canvas.width - this.width));
             this.y = Math.max(0, Math.min(this.y, this.game.canvas.height - this.height));
         } else {
-            // Movimento normal apenas se não estiver em knockback
+            // Movimento normal
             this.x += this.moveX * this.speed;
             this.y += this.moveY * this.speed;
             
-            // Atualiza o ângulo do corpo do tanque com base na direção do movimento
-            if (this.moveX !== 0 || this.moveY !== 0) {
-                this.bodyAngle = Math.atan2(this.moveY, this.moveX);
-                
-                // Adiciona rastros de rodas se estiver se movendo
-                if (this.game.gameTime - this.lastTrackTime > this.trackInterval) {
-                    this.createTrackMarks();
-                    this.lastTrackTime = this.game.gameTime;
-                }
-            }
+            // Limita o jogador às bordas do canvas
+            this.x = Math.max(0, Math.min(this.x, this.game.canvas.width - this.width));
+            this.y = Math.max(0, Math.min(this.y, this.game.canvas.height - this.height));
         }
-        
-        // NÃO limita o jogador às bordas do canvas para permitir a transição entre telas
-        // Essa verificação é feita na função checkScreenTransition do game.js
         
         // Reduz o tempo de invulnerabilidade
         if (this.invulnerableTime > 0) {
             this.invulnerableTime -= deltaTime;
-            if (this.invulnerableTime < 0) this.invulnerableTime = 0;
         }
         
-        // Log de depuração para posições próximas às bordas
-        if (this.x < 10 || this.x > this.game.canvas.width - this.width - 10 ||
-            this.y < 10 || this.y > this.game.canvas.height - this.height - 10) {
-            console.log("Jogador próximo à borda:", this.x, this.y);
+        // Atualiza as partículas do efeito de redução de cooldown
+        if (this.cooldownParticles && this.cooldownParticles.length > 0) {
+            this.updateCooldownParticles(deltaTime);
         }
         
-        // Log quando o jogador sai da tela
-        if (this.x < 0 || this.x > this.game.canvas.width ||
-            this.y < 0 || this.y > this.game.canvas.height) {
-            console.log("JOGADOR SAIU DA TELA:", this.x, this.y);
-        }
-        
-        // Atualiza os cooldowns
+        // Reduz os cooldowns dos poderes
         if (this.fireballCooldown > 0) {
-            this.fireballCooldown -= deltaTime;
+            // Aplica o multiplicador de cooldown se estiver ativo
+            this.fireballCooldown -= deltaTime * (1 / this.cooldownMultiplier);
             if (this.fireballCooldown < 0) this.fireballCooldown = 0;
             
-            // Atualiza a UI do cooldown
-            const cooldownPercent = (this.fireballCooldown / this.fireballMaxCooldown) * 100;
-            document.getElementById('fireballCooldown').style.height = `${cooldownPercent}%`;
+            // Atualiza a UI do cooldown se este for o poder atual
+            if (this.currentPower === 'fireball') {
+                const cooldownPercent = (this.fireballCooldown / this.availablePowers.find(p => p.id === 'fireball').maxCooldown) * 100;
+                const powerCooldown = document.getElementById('powerCooldown');
+                if (powerCooldown) {
+                    powerCooldown.style.height = `${cooldownPercent}%`;
+                }
+            }
         }
         
         if (this.aoeCooldown > 0) {
-            this.aoeCooldown -= deltaTime;
+            // Aplica o multiplicador de cooldown se estiver ativo
+            this.aoeCooldown -= deltaTime * (1 / this.cooldownMultiplier);
             if (this.aoeCooldown < 0) this.aoeCooldown = 0;
             
-            // Atualiza a UI do cooldown
-            const aoeCooldown = document.getElementById('aoeCooldown');
-            if (aoeCooldown) {
-                const cooldownPercent = (this.aoeCooldown / this.aoeMaxCooldown) * 100;
-                aoeCooldown.style.height = `${cooldownPercent}%`;
+            // Atualiza a UI do cooldown se este for o poder atual
+            if (this.currentPower === 'aoe') {
+                const cooldownPercent = (this.aoeCooldown / this.availablePowers.find(p => p.id === 'aoe').maxCooldown) * 100;
+                const powerCooldown = document.getElementById('powerCooldown');
+                if (powerCooldown) {
+                    powerCooldown.style.height = `${cooldownPercent}%`;
+                }
             }
         }
         
         if (this.iceCooldown > 0) {
-            this.iceCooldown -= deltaTime;
+            // Aplica o multiplicador de cooldown se estiver ativo
+            this.iceCooldown -= deltaTime * (1 / this.cooldownMultiplier);
             if (this.iceCooldown < 0) this.iceCooldown = 0;
             
-            // Atualiza a UI do cooldown
-            const iceCooldown = document.getElementById('iceCooldown');
-            if (iceCooldown) {
-                const cooldownPercent = (this.iceCooldown / this.iceMaxCooldown) * 100;
-                iceCooldown.style.height = `${cooldownPercent}%`;
+            // Atualiza a UI do cooldown se este for o poder atual
+            if (this.currentPower === 'ice') {
+                const cooldownPercent = (this.iceCooldown / this.availablePowers.find(p => p.id === 'ice').maxCooldown) * 100;
+                const powerCooldown = document.getElementById('powerCooldown');
+                if (powerCooldown) {
+                    powerCooldown.style.height = `${cooldownPercent}%`;
+                }
             }
         }
         
-        // Atualiza os rastros de rodas
-        for (let i = this.trackMarks.length - 1; i >= 0; i--) {
-            const track = this.trackMarks[i];
-            track.life -= deltaTime;
+        // Atualiza os inimigos congelados
+        this.updateFrozenEnemies();
+        
+        // Cria marcas de rastro se o jogador estiver se movendo
+        if (this.moveX !== 0 || this.moveY !== 0) {
+            // Atualiza o ângulo do corpo com base na direção do movimento
+            this.bodyAngle = Math.atan2(this.moveY, this.moveX);
             
-            if (track.life <= 0) {
+            // Cria marcas de rastro periodicamente
+            if (this.game.gameTime - this.lastTrackTime > this.trackInterval) {
+                this.createTrackMarks();
+                this.lastTrackTime = this.game.gameTime;
+            }
+        }
+        
+        // Atualiza o tempo de vida dos rastros e remove os expirados
+        for (let i = this.trackMarks.length - 1; i >= 0; i--) {
+            this.trackMarks[i].life -= deltaTime;
+            if (this.trackMarks[i].life <= 0) {
                 this.trackMarks.splice(i, 1);
             }
         }
-        
-        // Atualiza o estado dos inimigos congelados
-        this.updateFrozenEnemies();
     }
     
     createTrackMarks() {
@@ -227,12 +256,29 @@ export class Player {
         // Desenha os rastros de rodas primeiro (para ficarem atrás do tanque)
         this.drawTrackMarks(ctx);
         
+        // Desenha as partículas do efeito de redução de cooldown (atrás do tanque)
+        if (this.cooldownParticles && this.cooldownParticles.length > 0) {
+            this.drawCooldownParticles(ctx);
+        }
+        
+        // Desenha o indicador de redução de cooldown se estiver ativo
+        if (this.cooldownReductionEndTime > this.game.gameTime) {
+            this.drawCooldownReductionIndicator(ctx);
+        }
+        
         // Desenha o tanque
         ctx.save();
         
         // Aplica o efeito de invulnerabilidade (piscar)
         if (this.invulnerableTime > 0 && Math.floor(this.invulnerableTime / 100) % 2 === 0) {
             ctx.globalAlpha = 0.5;
+        }
+        
+        // Efeito visual de redução de cooldown ativo
+        if (this.cooldownReductionEndTime > this.game.gameTime) {
+            // Adiciona um brilho ciano ao redor do tanque
+            ctx.shadowColor = '#00FFFF';
+            ctx.shadowBlur = 10;
         }
         
         // Translada para o centro do tanque
@@ -297,6 +343,57 @@ export class Player {
         }
     }
     
+    drawCooldownParticles(ctx) {
+        for (const particle of this.cooldownParticles) {
+            ctx.save();
+            
+            // Define a opacidade com base no tempo de vida restante
+            ctx.globalAlpha = particle.alpha;
+            
+            // Desenha a partícula (pequeno círculo com brilho)
+            ctx.beginPath();
+            ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+            
+            // Adiciona um brilho ao redor da partícula
+            ctx.shadowColor = '#00FFFF';
+            ctx.shadowBlur = 5;
+            
+            // Preenche a partícula
+            ctx.fillStyle = particle.color;
+            ctx.fill();
+            
+            ctx.restore();
+        }
+    }
+    
+    drawCooldownReductionIndicator(ctx) {
+        // Só desenha se houver redução de cooldown ativa
+        if (this.cooldownMultiplier >= 1) return;
+        
+        // Calcula a redução percentual
+        const reductionPercent = Math.round((1 - this.cooldownMultiplier) * 100);
+        
+        // Desenha um pequeno ícone de ampulheta acima do jogador
+        ctx.save();
+        
+        // Posição acima do jogador
+        const x = this.x + this.width / 2;
+        const y = this.y - 20;
+        
+        // Desenha o ícone da ampulheta
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#00FFFF';
+        ctx.fillText('⏱️', x, y);
+        
+        // Desenha o texto com a porcentagem de redução
+        ctx.font = '12px Arial';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(`-${reductionPercent}%`, x, y + 15);
+        
+        ctx.restore();
+    }
+    
     setDirection(direction) {
         this.direction = direction;
     }
@@ -335,8 +432,8 @@ export class Player {
                 const projectile = new Projectile(
                     x, 
                     y, 
-                    10, 
-                    10, 
+                    this.fireballSize, 
+                    this.fireballSize, 
                     adjustedVelocityX, 
                     adjustedVelocityY, 
                     this.fireballDamage
@@ -351,14 +448,21 @@ export class Player {
             }, i * 100); // 100ms de atraso entre cada projétil
         }
         
-        this.fireballCooldown = this.fireballMaxCooldown;
+        // Define o cooldown (aplicando o multiplicador de cooldown)
+        const power = this.availablePowers.find(p => p.id === 'fireball');
+        this.fireballCooldown = power.maxCooldown * this.cooldownMultiplier;
         
-        // Atualiza a UI do cooldown
-        document.getElementById('fireballCooldown').style.height = '100%';
+        // Atualiza a UI
+        this.updatePowerSlotUI();
     }
     
     fireAOE() {
-        if (!this.aoeUnlocked || this.aoeCooldown > 0) return;
+        // Verifica se está em cooldown
+        if (this.aoeCooldown > 0) {
+            return;
+        }
+        
+        console.log("Usando poder de AOE!");
         
         // Centro do jogador
         const centerX = this.x + this.width / 2;
@@ -376,7 +480,7 @@ export class Player {
                 const aoe = new AOEEffect(
                     x, 
                     y, 
-                    80, // raio
+                    this.aoeSize, // raio personalizado
                     this.aoeDamage,
                     500 // duração em ms
                 );
@@ -385,17 +489,17 @@ export class Player {
             }, i * 200); // 200ms de atraso entre cada AOE
         }
         
-        this.aoeCooldown = this.aoeMaxCooldown;
+        // Define o cooldown (aplicando o multiplicador de cooldown)
+        const power = this.availablePowers.find(p => p.id === 'aoe');
+        this.aoeCooldown = power.maxCooldown * this.cooldownMultiplier;
         
-        // Atualiza a UI do cooldown
-        const aoeCooldown = document.getElementById('aoeCooldown');
-        if (aoeCooldown) {
-            aoeCooldown.style.height = '100%';
-        }
+        // Atualiza a UI
+        this.updatePowerSlotUI();
     }
     
     fireIce() {
-        if (!this.hasIcePower || this.iceCooldown > 0) return;
+        // Verifica se o poder está em cooldown
+        if (this.iceCooldown > 0) return;
         
         // Centro do jogador
         const centerX = this.x + this.width / 2;
@@ -423,8 +527,8 @@ export class Player {
                 const iceProjectile = new IceProjectile(
                     x, 
                     y, 
-                    10, 
-                    10, 
+                    this.iceSize, 
+                    this.iceSize, 
                     adjustedVelocityX, 
                     adjustedVelocityY, 
                     this.fireballDamage * 0.7 // Dano um pouco menor que a bola de fogo
@@ -439,13 +543,12 @@ export class Player {
             }, i * 100); // 100ms de atraso entre cada projétil
         }
         
-        this.iceCooldown = this.iceMaxCooldown;
+        // Define o cooldown (aplicando o multiplicador de cooldown)
+        const power = this.availablePowers.find(p => p.id === 'ice');
+        this.iceCooldown = power.maxCooldown * this.cooldownMultiplier;
         
-        // Atualiza a UI do cooldown
-        const iceCooldown = document.getElementById('iceCooldown');
-        if (iceCooldown) {
-            iceCooldown.style.height = '100%';
-        }
+        // Atualiza a UI
+        this.updatePowerSlotUI();
     }
     
     takeDamage(amount, knockbackX = 0, knockbackY = 0) {
@@ -467,7 +570,15 @@ export class Player {
         // Verifica se o jogador morreu
         if (this.health <= 0) {
             console.log("Jogador morreu!");
-            // Implementar lógica de morte
+            // Mostra a tela de game over
+            const gameOverOverlay = document.getElementById('gameOverOverlay');
+            gameOverOverlay.classList.add('visible');
+            
+            // Adiciona evento de clique ao botão de reiniciar
+            const restartButton = document.getElementById('restartButton');
+            restartButton.addEventListener('click', () => {
+                location.reload(); // Recarrega a página para reiniciar o jogo
+            });
         }
     }
     
@@ -488,6 +599,9 @@ export class Player {
     gainXP(amount) {
         console.log(`Jogador ganhou ${amount} XP!`);
         this.xp += amount;
+        
+        // Cria um alerta flutuante para o XP ganho
+        this.game.createFloatingAlert(`+${amount} XP`, this.x + this.width / 2, this.y - 20, '#ffff00');
         
         // Verifica se subiu de nível
         if (this.xp >= this.xpToNextLevel) {
@@ -517,58 +631,16 @@ export class Player {
         this.fireballDamage += 2;
         this.speed += 0.1;
         
+        // Cria um alerta flutuante para o level up
+        this.game.createFloatingAlert(`NÍVEL ${this.level}!`, this.x + this.width / 2, this.y - 30, '#ffff00');
+        
         console.log(`Nível ${this.level} alcançado!`);
         console.log(`Novo HP máximo: ${this.maxHealth}`);
         console.log(`Novo dano: ${this.fireballDamage}`);
         console.log(`Nova velocidade: ${this.speed.toFixed(1)}`);
         
-        // Desbloqueia o poder de AOE no nível 5
-        if (this.level === 5 && !this.aoeUnlocked) {
-            this.aoeUnlocked = true;
-            console.log("Poder de AOE desbloqueado!");
-            
-            // Atualiza o slot de habilidade na UI
-            const aoeSkill = document.querySelector('.skill.empty');
-            if (aoeSkill) {
-                aoeSkill.classList.remove('empty');
-                aoeSkill.classList.add('aoe');
-                aoeSkill.dataset.skill = 'aoe';
-                aoeSkill.querySelector('.skill-icon').textContent = '💥';
-                
-                // Adiciona o ID para o cooldown
-                const cooldownOverlay = aoeSkill.querySelector('.cooldown-overlay');
-                if (cooldownOverlay) {
-                    cooldownOverlay.id = 'aoeCooldown';
-                }
-                
-                // Ajusta a opacidade
-                aoeSkill.style.opacity = '1';
-            }
-            
-            // Desbloqueia o poder na lista de poderes
-            const aoePower = this.game.powersList.powers.find(p => p.id === 'aoe');
-            if (aoePower) {
-                aoePower.unlocked = true;
-                
-                // Atualiza o item na lista de poderes
-                const powerItem = document.querySelector(`.power-item[data-powerId="${aoePower.id}"]`);
-                if (powerItem) {
-                    powerItem.classList.remove('disabled');
-                    powerItem.draggable = true;
-                    powerItem.addEventListener('dragstart', this.game.handleDragStart.bind(this.game));
-                    powerItem.addEventListener('dragend', this.game.handleDragEnd.bind(this.game));
-                }
-            }
-            
-            // Primeiro mostra a mensagem de nível alcançado
-            this.game.ui.showMessage(`Nível ${this.level} alcançado!`, 2000);
-            
-            // Depois mostra a mensagem de poder desbloqueado
-            this.game.ui.showMessage("Novo poder desbloqueado: Dano em Área!", 3000);
-        } else {
-            // Se não desbloqueou nenhum poder, apenas mostra a mensagem de nível
-            this.game.ui.showMessage(`Nível ${this.level} alcançado!`, 2000);
-        }
+        // Notifica a UI sobre o level up
+        this.game.ui.showLevelUp(this.level);
         
         // Atualiza a UI
         this.game.ui.update();
@@ -649,9 +721,66 @@ export class Player {
         }
     }
     
-    // Método para usar o poder selecionado
+    // Método para atualizar o slot de poder na UI
+    updatePowerSlotUI() {
+        const powerSlot = document.getElementById('power-slot');
+        const powerIcon = powerSlot.querySelector('.power-icon');
+        const cooldownBar = powerSlot.querySelector('#powerCooldown');
+        const powerName = document.getElementById('powerName');
+        
+        // Encontra o poder atual
+        const power = this.availablePowers.find(p => p.id === this.currentPower);
+        
+        if (power) {
+            // Atualiza o ID do poder
+            powerSlot.setAttribute('data-power-id', power.id);
+            
+            // Atualiza o ícone
+            powerIcon.textContent = power.icon;
+            
+            // Atualiza o nome do poder
+            powerName.textContent = power.name;
+            
+            // Atualiza a descrição com informações sobre o tamanho
+            if (power.id === 'fireball') {
+                power.description = `Dispara uma bola de fogo na direção do cursor (Tamanho: ${this.fireballSize})`;
+            } else if (power.id === 'ice') {
+                power.description = `Dispara um projétil de gelo que congela os inimigos (Tamanho: ${this.iceSize})`;
+            } else if (power.id === 'aoe') {
+                power.description = `Cria uma explosão que causa dano em área (Raio: ${this.aoeSize})`;
+            }
+            
+            // Adiciona classes específicas do poder
+            powerSlot.className = 'power';
+            powerSlot.classList.add(`${power.id}-power`);
+            powerSlot.classList.add('selected');
+        }
+    }
+    
+    // Método para trocar o poder atual
+    changePower(newPowerId) {
+        // Verifica se o poder é diferente do atual
+        if (this.currentPower !== newPowerId) {
+            this.currentPower = newPowerId;
+            this.updatePowerSlotUI();
+            this.game.ui.showMessage(`Poder alterado para: ${this.getPowerName(newPowerId)}`, 2000);
+            
+            // Atualiza as informações do jogador se a tela de informações estiver aberta
+            if (this.game.isPlayerInfoVisible) {
+                this.game.updatePlayerInfo();
+            }
+        }
+    }
+    
+    // Método para obter o nome do poder pelo ID
+    getPowerName(powerId) {
+        const power = this.availablePowers.find(p => p.id === powerId);
+        return power ? power.name : 'Desconhecido';
+    }
+    
+    // Método para usar o poder atual
     usePower() {
-        switch (this.selectedPower) {
+        switch (this.currentPower) {
             case 'fireball':
                 this.fireProjectile();
                 break;
@@ -664,8 +793,104 @@ export class Player {
         }
     }
     
-    // Método para trocar o poder selecionado
-    selectPower(powerId) {
-        this.selectedPower = powerId;
+    // Método para aplicar redução de cooldown temporária
+    applyCooldownReduction(multiplier, duration) {
+        // Acumula o efeito de redução de cooldown (multiplicando o multiplicador atual)
+        this.cooldownMultiplier *= multiplier; // Acumula o efeito multiplicando
+        
+        // Não definimos mais um tempo de expiração
+        this.cooldownReductionEndTime = 0; // Zero indica que não expira
+        
+        // Atualiza visualmente os cooldowns na UI
+        this.updatePowerSlotUI();
+        
+        // Adiciona efeito visual ao jogador
+        this.addCooldownReductionEffect();
+    }
+    
+    // Método para adicionar efeito visual de redução de cooldown
+    addCooldownReductionEffect() {
+        // Cria um efeito de partículas ao redor do jogador
+        const particleCount = 20;
+        
+        for (let i = 0; i < particleCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 20 + Math.random() * 30;
+            
+            const particle = {
+                x: this.x + Math.cos(angle) * distance,
+                y: this.y + Math.sin(angle) * distance,
+                size: 2 + Math.random() * 3,
+                color: '#00FFFF',
+                alpha: 0.8,
+                lifetime: 1000 + Math.random() * 1000,
+                createdAt: this.game.gameTime,
+                angle: angle,
+                distance: distance
+            };
+            
+            if (!this.cooldownParticles) {
+                this.cooldownParticles = [];
+            }
+            
+            this.cooldownParticles.push(particle);
+        }
+    }
+    
+    // Método para atualizar as partículas do efeito de redução de cooldown
+    updateCooldownParticles(deltaTime) {
+        // Atualiza cada partícula
+        for (let i = this.cooldownParticles.length - 1; i >= 0; i--) {
+            const particle = this.cooldownParticles[i];
+            
+            // Calcula o tempo de vida restante
+            const elapsedTime = this.game.gameTime - particle.createdAt;
+            
+            // Remove partículas que expiraram
+            if (elapsedTime >= particle.lifetime) {
+                this.cooldownParticles.splice(i, 1);
+                continue;
+            }
+            
+            // Calcula a opacidade com base no tempo de vida
+            particle.alpha = 0.8 * (1 - elapsedTime / particle.lifetime);
+            
+            // Faz as partículas orbitarem o jogador
+            const orbitSpeed = 0.001; // Velocidade de órbita
+            particle.angle += orbitSpeed * deltaTime;
+            
+            // Atualiza a posição da partícula para seguir o jogador
+            particle.x = this.x + Math.cos(particle.angle) * particle.distance;
+            particle.y = this.y + Math.sin(particle.angle) * particle.distance;
+        }
+        
+        // Adiciona novas partículas periodicamente enquanto o efeito estiver ativo
+        if (this.cooldownMultiplier < 1 && this.game.gameTime % 500 < 20) {
+            this.addCooldownParticle();
+        }
+    }
+    
+    // Método para adicionar uma única partícula de efeito de cooldown
+    addCooldownParticle() {
+        const angle = Math.random() * Math.PI * 2;
+        const distance = 20 + Math.random() * 30;
+        
+        const particle = {
+            x: this.x + Math.cos(angle) * distance,
+            y: this.y + Math.sin(angle) * distance,
+            size: 2 + Math.random() * 3,
+            color: '#00FFFF',
+            alpha: 0.8,
+            lifetime: 1000 + Math.random() * 1000,
+            createdAt: this.game.gameTime,
+            angle: angle,
+            distance: distance
+        };
+        
+        if (!this.cooldownParticles) {
+            this.cooldownParticles = [];
+        }
+        
+        this.cooldownParticles.push(particle);
     }
 } 

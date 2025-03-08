@@ -22,6 +22,7 @@ export class Enemy {
         this.moveTimer = 0;
         this.moveInterval = 1000 + Math.random() * 2000; // Intervalo de movimento aleatório
         this.moveDirection = Math.random() * Math.PI * 2; // Direção aleatória
+        this.rotation = this.moveDirection; // Inicializa a rotação com a direção de movimento
         
         // Ajusta velocidade e intervalo com base no tipo
         if (this.type === 'pursuer') {
@@ -38,6 +39,10 @@ export class Enemy {
         this.shootCooldown = 0;
         this.shootMaxCooldown = this.type === 'pursuer' ? 2000 : 1000; // Perseguidores têm cooldown maior
         
+        // Cooldown de colisão com o player
+        this.collisionCooldown = 0;
+        this.collisionMaxCooldown = 500; // 500ms de cooldown após colidir com o player
+        
         // Aparência
         this.color = this.generateColor();
         this.tankType = Math.floor(Math.random() * 3); // 0: leve, 1: médio, 2: pesado
@@ -49,7 +54,6 @@ export class Enemy {
         }
         
         // Detalhes visuais adicionais
-        this.rotation = 0;
         this.pulseRate = 0.5 + Math.random() * 1.5; // Taxa de pulsação
         this.pulseAmount = 0.05 + Math.random() * 0.1; // Quantidade de pulsação
         this.pulseOffset = Math.random() * Math.PI * 2; // Deslocamento da pulsação
@@ -165,32 +169,23 @@ export class Enemy {
     }
     
     update(deltaTime, player, game) {
-        // Se o inimigo estiver morto ou invisível, não atualiza nada
-        if (this.dead || !this.visible) {
-            // Adiciona log para debug
-            if (this.dead) {
-                console.log("Tentando atualizar inimigo morto:", this);
-            }
-            return;
-        }
-        
-        // Atualiza a referência ao jogo se não tivermos uma
-        if (!this.game && game) {
-            this.game = game;
-        }
-        
-        // Atualiza as partículas de fumaça para inimigos quebrados
-        if (this.type === 'broken') {
-            this.updateSmokeParticles(deltaTime);
-        }
-        
-        // Atualiza o timer de movimento
-        this.moveTimer += deltaTime;
-        
         // Atualiza o cooldown de tiro
         if (this.shootCooldown > 0) {
             this.shootCooldown -= deltaTime;
         }
+        
+        // Atualiza o cooldown de colisão
+        if (this.collisionCooldown > 0) {
+            this.collisionCooldown -= deltaTime;
+            // Enquanto estiver em cooldown de colisão, a velocidade é reduzida
+            this.speed = this.originalSpeed * 0.5;
+        } else {
+            // Restaura a velocidade original quando o cooldown terminar
+            this.speed = this.originalSpeed;
+        }
+        
+        // Atualiza o timer de movimento
+        this.moveTimer += deltaTime;
         
         // Processa o knockback
         if (this.knockbackDuration > 0) {
@@ -208,9 +203,9 @@ export class Enemy {
             if (this.damageFlash < 0) this.damageFlash = 0;
         }
         
-        // Atualiza a rotação para inimigos em movimento
-        if (this.type !== 'broken') {
-            this.rotation = this.moveDirection; // Tanque aponta na direção do movimento
+        // Atualiza as partículas de fumaça para inimigos quebrados
+        if (this.type === 'broken') {
+            this.updateSmokeParticles(deltaTime);
         }
         
         // Verifica se deve atirar no jogador
@@ -302,6 +297,7 @@ export class Enemy {
             // Se o jogador estiver dentro do alcance de detecção, persegue-o
             if (distanceToPlayer < this.detectionRange) {
                 this.moveDirection = Math.atan2(dy, dx);
+                this.rotation = this.moveDirection; // Atualiza a rotação imediatamente
                 this.moveTimer = 0; // Reseta o timer para continuar perseguindo
             }
         }
@@ -310,6 +306,7 @@ export class Enemy {
         if (this.type === 'random' && this.moveTimer >= this.moveInterval) {
             this.moveTimer = 0;
             this.moveDirection = Math.random() * Math.PI * 2;
+            this.rotation = this.moveDirection; // Atualiza a rotação imediatamente
             
             // 50% de chance de ficar parado por um tempo
             if (Math.random() < 0.5) {
@@ -520,41 +517,45 @@ export class Enemy {
     }
     
     takeDamage(amount) {
-        this.health -= amount;
-        this.damageFlash = 0.5; // Efeito visual de dano
+        // Não aplica dano se o inimigo já estiver morto
+        if (this.dead) return;
         
+        // Aplica o dano
+        this.health -= amount;
+        
+        // Efeito visual de dano
+        this.damageFlash = 100; // 100ms de flash
+        
+        // Verifica se o inimigo morreu
         if (this.health <= 0) {
-            // Gera drop antes de marcar como morto
-            this.generateDrop();
+            this.health = 0;
+            this.dead = true;
             
-            // Log para debug
-            console.log(`Inimigo com ${this.xpValue} XP derrotado!`);
-            
-            // Se tivermos referência ao game, dá XP ao jogador
-            if (this.game && this.game.player) {
-                // Dá XP ao jogador
-                this.game.player.gainXP(this.xpValue);
-                
-                // Verifica se todos os inimigos foram eliminados
-                // Não precisamos verificar o índice, pois o array será filtrado no próximo frame
-                if (this.game.enemies.filter(e => !e.dead && e.visible).length <= 1) {
-                    this.game.markScreenAsCleared();
-                    console.log("Tela limpa de inimigos!");
-                }
-            } else {
-                console.warn('Inimigo derrotado mas sem referência ao jogo ou jogador!');
+            // Gera um drop aleatório
+            const drop = this.generateDrop();
+            if (drop && this.game) {
+                this.game.drops.push(drop);
             }
             
-            // Completamente destrói o inimigo
-            this.dead = true;
-            this.visible = false;
-            this.smokeParticles = [];
+            // Dá XP ao jogador
+            if (this.game && this.game.player) {
+                this.game.player.gainXP(this.xpValue);
+            }
             
-            // Retorna true para indicar que o inimigo foi destruído
-            return true;
+            // Verifica se este foi o último inimigo
+            if (this.game && this.game.enemies.length === 1) { // Se só tem este inimigo (que acabou de morrer)
+                console.log("Último inimigo derrotado! Verificando spawn de baú...");
+                
+                // Força a geração de um baú com 50% de chance
+                if (Math.random() < 0.5) {
+                    setTimeout(() => {
+                        if (this.game.chests.length === 0) { // Só gera se não houver outros baús
+                            this.game.forceChestSpawn();
+                        }
+                    }, 1000); // Espera 1 segundo para gerar o baú
+                }
+            }
         }
-        
-        return false; // Inimigo ainda vivo
     }
     
     generateDrop() {
@@ -575,11 +576,12 @@ export class Enemy {
                 collected: false
             };
             
-            // Adiciona o drop ao jogo
-            if (this.game) {
-                this.game.addDrop(drop);
-            }
+            // Retorna o drop
+            return drop;
         }
+        
+        // Retorna null se não gerar drop
+        return null;
     }
     
     applyKnockback(directionX, directionY, force) {
@@ -753,5 +755,10 @@ export class Enemy {
         
         // Converte de volta para hex
         return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    }
+    
+    // Método para aplicar o cooldown de colisão
+    applyCollisionCooldown() {
+        this.collisionCooldown = this.collisionMaxCooldown;
     }
 } 

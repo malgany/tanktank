@@ -195,9 +195,11 @@ canvas {
     color: white;
     padding: 5px 10px;
     border-radius: 3px;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: bold;
     z-index: 100;
+    min-width: 150px;
+    text-align: center;
 }
 
 /* Estilos para o mapa completo */
@@ -569,28 +571,34 @@ canvas {
 /* Estilos para os poderes */
 .powers-container {
     display: flex;
+    justify-content: center;
+    align-items: center;
     gap: 10px;
 }
 
 .power {
     position: relative;
-    width: 40px;
-    height: 40px;
-    background-color: #444;
-    border-radius: 5px;
+    width: 50px;
+    height: 50px;
+    background-color: rgba(40, 40, 40, 0.8);
+    border: 2px solid #555;
+    border-radius: 8px;
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 20px;
     cursor: pointer;
+    transition: all 0.2s;
+    overflow: hidden;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
 }
 
 .power.selected {
-    border: 2px solid #ffcc00;
-    box-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+    border-color: #ffcc00;
+    box-shadow: 0 0 10px rgba(255, 204, 0, 0.7);
 }
 
 .power-icon {
+    font-size: 24px;
     z-index: 2;
 }
 
@@ -600,8 +608,15 @@ canvas {
     left: 0;
     width: 100%;
     height: 100%;
+    background-color: transparent;
     overflow: hidden;
-    border-radius: 5px;
+    z-index: 1;
+}
+
+@keyframes cooldownGlow {
+    0% { box-shadow: 0 -2px 5px rgba(255, 215, 0, 0.4); }
+    50% { box-shadow: 0 -2px 8px rgba(255, 215, 0, 0.7); }
+    100% { box-shadow: 0 -2px 5px rgba(255, 215, 0, 0.4); }
 }
 
 .cooldown {
@@ -610,53 +625,341 @@ canvas {
     left: 0;
     width: 100%;
     height: 0%;
-    background-color: rgba(0, 0, 0, 0.7);
+    background: linear-gradient(to top, rgba(255, 215, 0, 0.8), rgba(255, 165, 0, 0.6)); /* Gradiente dourado/laranja */
     transition: height 0.1s linear;
     z-index: 1;
+    border-top: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 -2px 5px rgba(255, 215, 0, 0.4); /* Sombra dourada */
+    animation: cooldownGlow 1.5s infinite ease-in-out; /* Animação de brilho */
 }
 
-.power-key {
+.power:hover {
+    transform: scale(1.05);
+}
+
+.power:active {
+    transform: scale(0.95);
+}
+
+.power-name {
     position: absolute;
-    bottom: -5px;
-    right: -5px;
-    width: 16px;
-    height: 16px;
-    background-color: #333;
-    border-radius: 50%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 10px;
+    bottom: -25px;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    font-size: 12px;
     color: white;
-    z-index: 3;
+    text-shadow: 1px 1px 2px black;
+    opacity: 0;
+    transition: opacity 0.2s, bottom 0.2s;
 }
 
-/* Estilos específicos para cada poder */
+.power:hover .power-name {
+    opacity: 1;
+    bottom: -20px;
+}
+
+/* Estilos específicos para cada tipo de poder */
 .fireball-power .power-icon {
-    color: #ff4500;
-}
-
-.aoe-power .power-icon {
-    color: #ff8c00;
+    color: #FF4500;
 }
 
 .ice-power .power-icon {
-    color: #00ffff;
+    color: #00FFFF;
 }
 
-.ice-power {
-    background-color: #1e3a5f;
+.aoe-power .power-icon {
+    color: #FFA500;
 }
 
-/* Efeito de brilho para o poder de gelo */
-@keyframes iceGlow {
-    0% { box-shadow: 0 0 5px rgba(0, 255, 255, 0.3); }
-    50% { box-shadow: 0 0 15px rgba(0, 255, 255, 0.5); }
-    100% { box-shadow: 0 0 5px rgba(0, 255, 255, 0.3); }
+/* Modal de troca de poder */
+.power-swap-content {
+    max-width: 500px;
+    padding: 20px;
+    text-align: center;
 }
 
-.ice-power.selected {
-    border: 2px solid #00ffff;
-    box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
-    animation: iceGlow 2s infinite;
+.power-swap-container {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    margin: 20px 0;
+}
+
+.power-display {
+    width: 150px;
+    height: 180px;
+    background-color: rgba(0, 0, 0, 0.7);
+    border: 2px solid #555;
+    border-radius: 10px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.large-icon {
+    font-size: 48px;
+    margin-bottom: 10px;
+}
+
+.power-name {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #FFF;
+}
+
+.power-description {
+    font-size: 14px;
+    color: #CCC;
+}
+
+.swap-icon {
+    font-size: 36px;
+    color: #FFD700;
+    margin: 0 15px;
+    animation: pulse 1.5s infinite;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.modal-button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.accept-button {
+    background-color: #2ecc71;
+    color: white;
+}
+
+.accept-button:hover {
+    background-color: #27ae60;
+    transform: scale(1.05);
+}
+
+.reject-button {
+    background-color: #e74c3c;
+    color: white;
+}
+
+.reject-button:hover {
+    background-color: #c0392b;
+    transform: scale(1.05);
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Estilos para a tela de Game Over */
+.game-over-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 1s ease;
+    pointer-events: none;
+}
+
+.game-over-overlay.visible {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.game-over-text {
+    font-size: 72px;
+    font-weight: bold;
+    color: #ff0000;
+    text-shadow: 0 0 10px #ff0000, 0 0 20px #ff0000;
+    margin-bottom: 30px;
+    animation: pulse 2s infinite;
+}
+
+.restart-button {
+    padding: 15px 30px;
+    font-size: 24px;
+    background-color: #ff3333;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.restart-button:hover {
+    background-color: #ff6666;
+    transform: scale(1.1);
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+/* Modal de troca de poder */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+#powerSwapModal .modal-content {
+    background-color: #222;
+    border: 2px solid #444;
+    border-radius: 10px;
+    padding: 20px;
+    width: 500px;
+    max-width: 90%;
+    color: #fff;
+    text-align: center;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+#powerSwapModal h2 {
+    color: #FFD700;
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 24px;
+    text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+}
+
+.power-comparison {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    margin: 20px 0;
+}
+
+.current-power, .new-power {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px;
+    background-color: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    width: 40%;
+}
+
+.swap-arrow {
+    font-size: 32px;
+    color: #FFD700;
+    animation: pulse 1.5s infinite;
+}
+
+.power-icon {
+    font-size: 36px;
+    margin-bottom: 10px;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.power-description {
+    margin: 20px 0;
+    color: #ccc;
+    font-style: italic;
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+
+#confirmSwapBtn, #cancelSwapBtn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+#confirmSwapBtn {
+    background-color: #4CAF50;
+    color: white;
+}
+
+#confirmSwapBtn:hover {
+    background-color: #45a049;
+    transform: scale(1.05);
+}
+
+#cancelSwapBtn {
+    background-color: #f44336;
+    color: white;
+}
+
+#cancelSwapBtn:hover {
+    background-color: #d32f2f;
+    transform: scale(1.05);
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 0.7;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 0.7;
+    }
+}
+
+.cooldown-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    z-index: 2;
+    pointer-events: none;
 } 
