@@ -8,10 +8,13 @@ body {
     font-family: 'Arial', sans-serif;
     background-color: #222;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
-    height: 100vh;
-    overflow: hidden;
+    min-height: 100vh;
+    padding: 20px 0;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .game-container {
@@ -962,4 +965,59 @@ canvas {
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
     z-index: 2;
     pointer-events: none;
+}
+
+/* Estilos para os controles do jogo fora do canvas */
+.game-controls-info {
+    width: 800px;
+    margin: 15px auto 0;
+    padding: 8px 12px;
+    background-color: rgba(30, 30, 30, 0.8);
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    display: flex;
+    justify-content: space-between;
+    color: #ccc;
+    font-size: 14px;
+    border: 1px solid #444;
+}
+
+.controls-section {
+    display: flex;
+    gap: 15px;
+}
+
+.control-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 8px;
+}
+
+.control-key {
+    font-weight: bold;
+    color: #fff;
+    background-color: #333;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-bottom: 3px;
+    font-family: monospace;
+    border: 1px solid #555;
+    transition: background-color 0.2s, transform 0.2s;
+}
+
+.control-item:hover .control-key {
+    background-color: #444;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.control-desc {
+    font-size: 12px;
+    color: #aaa;
+    transition: color 0.2s;
+}
+
+.control-item:hover .control-desc {
+    color: #ddd;
 } 
