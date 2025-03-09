@@ -1132,4 +1132,31 @@ export class Player {
         // Atualiza a UI
         this.updatePowerSlotUI();
     }
+    
+    /**
+     * Aumenta o dano de todos os poderes
+     * @param {number} amount - Quantidade de dano a ser aumentada
+     */
+    increaseDamage(amount) {
+        // Aumenta o dano de todos os poderes
+        this.fireballDamage += amount;
+        this.aoeDamage += amount;
+        this.arrowDamage += amount;
+        
+        // Aumenta o dano do veneno proporcionalmente
+        // O veneno causa dano ao longo do tempo, então o aumento é menor
+        this.poisonDamage += amount * 0.5;
+        
+        // Atualiza as estatísticas
+        this.powerStats.poisonDamage += amount * 0.5;
+        
+        // Atualiza a UI
+        this.updatePowerSlotUI();
+        
+        // Cria um alerta flutuante
+        this.game.createFloatingAlert(`DANO +${amount}`, this.x + this.width / 2, this.y - 20, '#ff0000');
+        
+        // Mostra uma mensagem
+        this.game.ui.showMessage(`Dano aumentado em ${amount}!`, 3000);
+    }
 } 

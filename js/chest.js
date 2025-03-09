@@ -190,6 +190,8 @@ export class Chest {
                 this.game.player.powerMultiplier = (this.game.player.powerMultiplier || 1) + 1;
                 // Atualiza as estatísticas
                 this.game.player.powerStats.powerMultiplier++;
+                // Aumenta o dano de todos os poderes, incluindo o veneno
+                this.game.player.increaseDamage(1);
                 this.game.ui.showMessage(`Poder +1! Todos os poderes aumentados!`, 3000);
                 // Cria um alerta flutuante
                 this.game.createFloatingAlert(`PODER +1`, this.x, this.y - 20, '#ff0000');
@@ -266,9 +268,9 @@ export class Chest {
                     this.game.showPowerSwapModal(this.itemType);
                 } else {
                     // Se for o mesmo poder, aumenta o dano do veneno
-                    this.game.player.poisonDamage += 1; // Aumenta 1 ponto de dano
+                    this.game.player.increaseDamage(2);
                     this.game.ui.showMessage(`Veneno melhorado! Dano aumentado!`, 3000);
-                    this.game.createFloatingAlert(`DANO +1`, this.x, this.y - 40, '#ff00ff');
+                    this.game.createFloatingAlert(`DANO +2`, this.x, this.y - 40, '#ff00ff');
                 }
                 break;
                 
