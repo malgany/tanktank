@@ -1,4 +1,5 @@
 import { Projectile } from './projectile.js';
+import { CONFIG } from './config.js';
 
 export class Chest {
     constructor(x, y, game) {

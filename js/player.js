@@ -1,33 +1,34 @@
 import { Projectile, IceProjectile, PoisonProjectile, ArrowProjectile } from './projectile.js';
 import { AOEEffect } from './aoe.js';
+import { CONFIG } from './config.js';
 
 export class Player {
     constructor(game) {
         this.game = game;
         
         // Posição e dimensões
-        this.width = 30;
-        this.height = 30;
+        this.width = CONFIG.PLAYER.WIDTH;
+        this.height = CONFIG.PLAYER.HEIGHT;
         
         // Posiciona o jogador no centro da tela
         this.x = game.canvas.width / 2 - this.width / 2;
         this.y = game.canvas.height / 2 - this.height / 2;
         
         // Movimento
-        this.speed = 3;
+        this.speed = CONFIG.PLAYER.SPEED;
         this.moveX = 0;
         this.moveY = 0;
         
         // Vida e XP
-        this.health = 100;
-        this.maxHealth = 100;
+        this.health = CONFIG.PLAYER.MAX_HEALTH;
+        this.maxHealth = CONFIG.PLAYER.MAX_HEALTH;
         this.xp = 0;
         this.level = 1;
-        this.xpToNextLevel = 100;
+        this.xpToNextLevel = CONFIG.PLAYER.XP_TO_NEXT_LEVEL;
         
         // Invulnerabilidade temporária após tomar dano
         this.invulnerableTime = 0;
-        this.invulnerableDuration = 1000; // 1 segundo
+        this.invulnerableDuration = CONFIG.PLAYER.INVULNERABLE_DURATION; // 1 segundo
         
         // Knockback
         this.knockbackX = 0;
@@ -36,30 +37,30 @@ export class Player {
         
         // Cooldowns de habilidades
         this.fireballCooldown = 0;
-        this.fireballMaxCooldown = 500; // 0.5 segundos
+        this.fireballMaxCooldown = CONFIG.PLAYER.FIREBALL_MAX_COOLDOWN; // 0.5 segundos
         this.aoeCooldown = 0;
-        this.aoeMaxCooldown = 3000; // 3 segundos
+        this.aoeMaxCooldown = CONFIG.PLAYER.AOE_MAX_COOLDOWN; // 3 segundos
         this.iceCooldown = 0;
         this.poisonCooldown = 0;
-        this.poisonMaxCooldown = 1500; // 1.5 segundos
+        this.poisonMaxCooldown = CONFIG.PLAYER.POISON_MAX_COOLDOWN; // 1.5 segundos
         this.arrowCooldown = 0;
-        this.arrowMaxCooldown = 250; // 0.25 segundos (metade do tiro de fogo)
+        this.arrowMaxCooldown = CONFIG.PLAYER.ARROW_MAX_COOLDOWN; // 0.25 segundos (metade do tiro de fogo)
         
         // Dano das habilidades
-        this.fireballDamage = 10;
-        this.aoeDamage = 15;
-        this.poisonDamage = 0.5; // Dano por segundo do veneno
-        this.arrowDamage = 12; // Dano das flechas
+        this.fireballDamage = CONFIG.PLAYER.FIREBALL_DAMAGE;
+        this.aoeDamage = CONFIG.PLAYER.AOE_DAMAGE;
+        this.poisonDamage = CONFIG.PLAYER.POISON_DAMAGE; // Dano por segundo do veneno
+        this.arrowDamage = CONFIG.PLAYER.ARROW_DAMAGE; // Dano das flechas
         
         // Tamanho dos projéteis
-        this.fireballSize = 10; // Tamanho inicial
-        this.iceSize = 10; // Tamanho inicial
-        this.aoeSize = 80; // Raio inicial
-        this.poisonSize = 10; // Tamanho inicial
-        this.arrowSize = 12; // Tamanho inicial
+        this.fireballSize = CONFIG.PLAYER.FIREBALL_SIZE;
+        this.iceSize = CONFIG.PLAYER.ICE_SIZE;
+        this.poisonSize = CONFIG.PLAYER.POISON_SIZE;
+        this.arrowSize = CONFIG.PLAYER.ARROW_SIZE;
+        this.aoeSize = CONFIG.PLAYER.AOE_SIZE;
         
-        // Duração dos efeitos
-        this.iceDuration = 2000; // Duração do congelamento em ms
+        // Duração do gelo
+        this.iceDuration = CONFIG.PLAYER.ICE_DURATION;
         
         // Direção atual (para o disparo)
         this.direction = 'right'; // 'up', 'right', 'down', 'left'

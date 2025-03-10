@@ -66,6 +66,19 @@ A estrutura do projeto é modular, com arquivos separados para cada componente d
 - `input.js`: Processa a entrada do usuário
 - `ui.js`: Atualiza a interface do usuário
 
+## Arquivo de Configuração
+
+O jogo agora possui um arquivo de configuração centralizado em `js/config.js`. Este arquivo contém todas as constantes e valores de configuração do jogo, incluindo:
+
+- Configurações do Mundo (tamanho, posição inicial)
+- Configurações do Jogador (atributos, poderes)
+- Configurações de Baús (chance de spawn, intervalo)
+- Configurações de Inimigos (quantidade base, multiplicador de poder)
+
+Para ajustar os valores e personalizar o jogo, basta editar este arquivo. Os valores também continuam sendo configuráveis pela interface do jogo através do modal de configurações.
+
+O arquivo `config.js` também possui métodos para salvar e carregar configurações do localStorage, o que permite persistência das configurações entre sessões.
+
 ## Divirta-se!
 
 Explore o mundo, derrote inimigos e veja até onde consegue chegar. Boa sorte! 

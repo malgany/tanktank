@@ -6,6 +6,7 @@ import { Projectile, IceProjectile, PoisonProjectile, ArrowProjectile } from './
 import { AOEEffect } from './aoe.js';
 import { World } from './world.js';
 import { UI } from './ui.js';
+import { CONFIG } from './config.js';
 
 export class Game {
     constructor() {
@@ -14,16 +15,16 @@ export class Game {
         this.setupCanvas();
         
         // Inicializa o mundo primeiro
-        this.world = new World(25, 25);
+        this.world = new World(CONFIG.WORLD.WIDTH, CONFIG.WORLD.HEIGHT);
         console.log("Mundo inicializado:", {
             width: this.world.width,
             height: this.world.height,
             screenCount: this.world.screens.length
         });
         
-        // Define a posição inicial do jogador no meio do mapa [12,12]
-        this.currentScreenX = 12;
-        this.currentScreenY = 12;
+        // Define a posição inicial do jogador no meio do mapa
+        this.currentScreenX = CONFIG.WORLD.INITIAL_SCREEN_X;
+        this.currentScreenY = CONFIG.WORLD.INITIAL_SCREEN_Y;
         
         this.player = new Player(this);
         this.ui = new UI(this);
@@ -37,6 +38,10 @@ export class Game {
         
         // Estado do jogo
         this.isPaused = false;
+        
+        // Configurações de baús
+        this.chestSpawnChance = CONFIG.CHEST.SPAWN_CHANCE;
+        this.minChestSpawnInterval = CONFIG.CHEST.MIN_SPAWN_INTERVAL;
         
         // Obtém o tipo de terreno da tela inicial
         const initialScreenType = this.world.getScreenType(this.currentScreenX, this.currentScreenY);
@@ -2273,7 +2278,8 @@ export class Game {
             }
         };
         
-        localStorage.setItem('gameConfig', JSON.stringify(config));
+        // Usa o método do CONFIG para salvar as configurações
+        CONFIG.saveToLocalStorage(config);
         
         // Exibe uma mensagem de confirmação
         this.createFloatingAlert('Configurações salvas com sucesso!', this.canvas.width / 2, this.canvas.height / 2, '#00b4d8');
@@ -2289,66 +2295,52 @@ export class Game {
     
     // Método para carregar as configurações do localStorage
     loadConfig() {
-        const savedConfig = localStorage.getItem('gameConfig');
+        // Aplica as configurações do jogador a partir do CONFIG
+        // Isso é feito automaticamente quando o CONFIG é carregado
+        // Aqui precisamos apenas atualizar o estado do jogo
         
-        if (savedConfig) {
-            try {
-                const config = JSON.parse(savedConfig);
+        // Atualiza os atributos do jogador
+        this.player.maxHealth = CONFIG.PLAYER.MAX_HEALTH;
+        this.player.health = CONFIG.PLAYER.MAX_HEALTH; // Restaura a vida para o máximo
+        this.player.speed = CONFIG.PLAYER.SPEED;
+        this.player.xpToNextLevel = CONFIG.PLAYER.XP_TO_NEXT_LEVEL;
+        this.player.invulnerableDuration = CONFIG.PLAYER.INVULNERABLE_DURATION;
                 
-                // Aplica as configurações do jogador
-                if (config.player) {
-                    this.player.maxHealth = config.player.maxHealth || this.player.maxHealth;
-                    this.player.health = config.player.maxHealth || this.player.health; // Restaura a vida para o máximo
-                    this.player.speed = config.player.speed || this.player.speed;
-                    this.player.xpToNextLevel = config.player.xpToNextLevel || this.player.xpToNextLevel;
-                    this.player.invulnerableDuration = config.player.invulnerableDuration || this.player.invulnerableDuration;
-                    
-                    // Configurações dos poderes
-                    this.player.fireballMaxCooldown = config.player.fireballMaxCooldown || this.player.fireballMaxCooldown;
-                    this.player.fireballDamage = config.player.fireballDamage || this.player.fireballDamage;
-                    this.player.fireballSize = config.player.fireballSize || this.player.fireballSize;
-                    
-                    // Configurações do gelo
-                    this.player.iceSize = config.player.iceSize || this.player.iceSize;
-                    this.player.iceDuration = config.player.iceDuration || this.player.iceDuration;
-                    
-                    this.player.aoeMaxCooldown = config.player.aoeMaxCooldown || this.player.aoeMaxCooldown;
-                    this.player.aoeDamage = config.player.aoeDamage || this.player.aoeDamage;
-                    this.player.aoeSize = config.player.aoeSize || this.player.aoeSize;
-                    
-                    this.player.poisonMaxCooldown = config.player.poisonMaxCooldown || this.player.poisonMaxCooldown;
-                    this.player.poisonDamage = config.player.poisonDamage || this.player.poisonDamage;
-                    this.player.poisonSize = config.player.poisonSize || this.player.poisonSize;
-                    
-                    this.player.arrowMaxCooldown = config.player.arrowMaxCooldown || this.player.arrowMaxCooldown;
-                    this.player.arrowDamage = config.player.arrowDamage || this.player.arrowDamage;
-                    this.player.arrowSize = config.player.arrowSize || this.player.arrowSize;
-                    
-                    // Atualiza os poderes disponíveis
-                    const fireballPower = this.player.availablePowers.find(p => p.id === 'fireball');
-                    if (fireballPower) fireballPower.maxCooldown = this.player.fireballMaxCooldown;
-                    
-                    const aoePower = this.player.availablePowers.find(p => p.id === 'aoe');
-                    if (aoePower) aoePower.maxCooldown = this.player.aoeMaxCooldown;
-                    
-                    const poisonPower = this.player.availablePowers.find(p => p.id === 'poison');
-                    if (poisonPower) poisonPower.maxCooldown = this.player.poisonMaxCooldown;
-                    
-                    const arrowPower = this.player.availablePowers.find(p => p.id === 'arrow');
-                    if (arrowPower) arrowPower.maxCooldown = this.player.arrowMaxCooldown;
-                }
-                
-                // Aplica as configurações do jogo
-                if (config.game) {
-                    this.chestSpawnChance = config.game.chestSpawnChance || this.chestSpawnChance;
-                    this.minChestSpawnInterval = config.game.minChestSpawnInterval || this.minChestSpawnInterval;
-                }
-                
-                console.log('Configurações carregadas com sucesso do localStorage');
-            } catch (error) {
-                console.error('Erro ao carregar configurações:', error);
-            }
-        }
+        // Configurações dos poderes
+        this.player.fireballMaxCooldown = CONFIG.PLAYER.FIREBALL_MAX_COOLDOWN;
+        this.player.fireballDamage = CONFIG.PLAYER.FIREBALL_DAMAGE;
+        this.player.fireballSize = CONFIG.PLAYER.FIREBALL_SIZE;
+        
+        this.player.aoeMaxCooldown = CONFIG.PLAYER.AOE_MAX_COOLDOWN;
+        this.player.aoeDamage = CONFIG.PLAYER.AOE_DAMAGE;
+        this.player.aoeSize = CONFIG.PLAYER.AOE_SIZE;
+        
+        this.player.poisonMaxCooldown = CONFIG.PLAYER.POISON_MAX_COOLDOWN;
+        this.player.poisonDamage = CONFIG.PLAYER.POISON_DAMAGE;
+        this.player.poisonSize = CONFIG.PLAYER.POISON_SIZE;
+        
+        this.player.arrowMaxCooldown = CONFIG.PLAYER.ARROW_MAX_COOLDOWN;
+        this.player.arrowDamage = CONFIG.PLAYER.ARROW_DAMAGE;
+        this.player.arrowSize = CONFIG.PLAYER.ARROW_SIZE;
+        
+        // Atualiza os poderes disponíveis
+        const fireballPower = this.player.availablePowers.find(p => p.id === 'fireball');
+        if (fireballPower) fireballPower.maxCooldown = CONFIG.PLAYER.FIREBALL_MAX_COOLDOWN;
+        
+        const aoePower = this.player.availablePowers.find(p => p.id === 'aoe');
+        if (aoePower) aoePower.maxCooldown = CONFIG.PLAYER.AOE_MAX_COOLDOWN;
+        
+        const poisonPower = this.player.availablePowers.find(p => p.id === 'poison');
+        if (poisonPower) poisonPower.maxCooldown = CONFIG.PLAYER.POISON_MAX_COOLDOWN;
+        
+        const arrowPower = this.player.availablePowers.find(p => p.id === 'arrow');
+        if (arrowPower) arrowPower.maxCooldown = CONFIG.PLAYER.ARROW_MAX_COOLDOWN;
+        
+        // Configurações do jogo
+        this.chestSpawnChance = CONFIG.CHEST.SPAWN_CHANCE;
+        this.minChestSpawnInterval = CONFIG.CHEST.MIN_SPAWN_INTERVAL;
+        
+        console.log('Configurações carregadas com sucesso do CONFIG');
     }
     
     // Métodos auxiliares para obter valores dos inputs com tratamento de erro
@@ -2371,63 +2363,42 @@ export class Game {
     // Método para restaurar as configurações padrão
     resetConfig() {
         // Valores padrão do jogador
-        document.getElementById('playerHealth').value = 100;
-        document.getElementById('playerSpeed').value = 3;
-        document.getElementById('playerXpToNextLevel').value = 100;
-        document.getElementById('playerInvulnerableDuration').value = 1000;
+        document.getElementById('playerHealth').value = CONFIG.PLAYER.MAX_HEALTH;
+        document.getElementById('playerSpeed').value = CONFIG.PLAYER.SPEED;
+        document.getElementById('playerXpToNextLevel').value = CONFIG.PLAYER.XP_TO_NEXT_LEVEL;
+        document.getElementById('playerInvulnerableDuration').value = CONFIG.PLAYER.INVULNERABLE_DURATION;
         
         // Valores padrão dos poderes
-        document.getElementById('fireballCooldown').value = 500;
-        document.getElementById('fireballDamage').value = 10;
-        document.getElementById('fireballSize').value = 10;
+        document.getElementById('fireballCooldown').value = CONFIG.PLAYER.FIREBALL_MAX_COOLDOWN;
+        document.getElementById('fireballDamage').value = CONFIG.PLAYER.FIREBALL_DAMAGE;
+        document.getElementById('fireballSize').value = CONFIG.PLAYER.FIREBALL_SIZE;
         
-        document.getElementById('iceCooldown').value = 2000;
-        document.getElementById('iceDamage').value = 7;
-        document.getElementById('iceSize').value = 10;
+        document.getElementById('iceCooldown').value = CONFIG.PLAYER.ICE_MAX_COOLDOWN;
+        document.getElementById('iceDamage').value = CONFIG.PLAYER.ICE_DAMAGE;
+        document.getElementById('iceSize').value = CONFIG.PLAYER.ICE_SIZE;
+        document.getElementById('iceFreezeTime').value = CONFIG.PLAYER.ICE_DURATION;
         
-        document.getElementById('aoeCooldown').value = 3000;
-        document.getElementById('aoeDamage').value = 15;
-        document.getElementById('aoeSize').value = 80;
+        document.getElementById('aoeCooldown').value = CONFIG.PLAYER.AOE_MAX_COOLDOWN;
+        document.getElementById('aoeDamage').value = CONFIG.PLAYER.AOE_DAMAGE;
+        document.getElementById('aoeSize').value = CONFIG.PLAYER.AOE_SIZE;
         
-        document.getElementById('poisonCooldown').value = 1500;
-        document.getElementById('poisonDamage').value = 0.5;
-        document.getElementById('poisonSize').value = 10;
+        document.getElementById('poisonCooldown').value = CONFIG.PLAYER.POISON_MAX_COOLDOWN;
+        document.getElementById('poisonDamage').value = CONFIG.PLAYER.POISON_DAMAGE;
+        document.getElementById('poisonSize').value = CONFIG.PLAYER.POISON_SIZE;
         
-        document.getElementById('arrowCooldown').value = 250;
-        document.getElementById('arrowDamage').value = 12;
-        document.getElementById('arrowSize').value = 12;
+        document.getElementById('arrowCooldown').value = CONFIG.PLAYER.ARROW_MAX_COOLDOWN;
+        document.getElementById('arrowDamage').value = CONFIG.PLAYER.ARROW_DAMAGE;
+        document.getElementById('arrowSize').value = CONFIG.PLAYER.ARROW_SIZE;
         
-        // Valores padrão de efeitos especiais
-        document.getElementById('iceFreezeTime').value = 2000;
-        document.getElementById('poisonDuration').value = 5000;
-        document.getElementById('arrowRange').value = 50;
+        // Valores padrão dos baús
+        document.getElementById('chestSpawnChance').value = CONFIG.CHEST.SPAWN_CHANCE * 100; // Converte para porcentagem
+        document.getElementById('minChestSpawnInterval').value = CONFIG.CHEST.MIN_SPAWN_INTERVAL;
         
-        // Valores padrão de baús
-        document.getElementById('chestSpawnChance').value = 80;
-        document.getElementById('minChestSpawnInterval').value = 10000;
+        // Valores padrão dos inimigos
+        document.getElementById('baseEnemyCount').value = CONFIG.ENEMY.BASE_COUNT;
+        document.getElementById('enemyPowerMultiplier').value = CONFIG.ENEMY.POWER_MULTIPLIER;
         
-        // Valores padrão de probabilidades de itens
-        document.getElementById('powerUpChance').value = 12.5;
-        document.getElementById('ricochetChance').value = 12.5;
-        document.getElementById('fireballChance').value = 12.5;
-        document.getElementById('iceChance').value = 12.5;
-        document.getElementById('aoeChance').value = 12.5;
-        document.getElementById('poisonChance').value = 12.5;
-        document.getElementById('arrowChance').value = 12.5;
-        document.getElementById('cooldownReductionChance').value = 12.5;
-        
-        // Valores padrão de melhorias
-        document.getElementById('cooldownReductionValue').value = 2.5;
-        
-        // Remove as configurações do localStorage
-        localStorage.removeItem('gameConfig');
-        
-        // Exibe uma mensagem de confirmação
-        this.createFloatingAlert('Configurações restauradas para os valores padrão!', this.canvas.width / 2, this.canvas.height / 2, '#00b4d8');
-        
-        // Recarrega a página para aplicar as configurações padrão
-        setTimeout(() => {
-            window.location.reload();
-        }, 1000); // Espera 1 segundo para que o usuário veja a mensagem de confirmação
+        // Exibe mensagem de confirmação
+        this.createFloatingAlert('Configurações restauradas para o padrão!', this.canvas.width / 2, this.canvas.height / 2, '#00b4d8');
     }
 } 
