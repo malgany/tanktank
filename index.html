@@ -11,15 +11,15 @@
         <div class="game-area">
             <canvas id="gameCanvas"></canvas>
             <div class="map-position" id="mapPosition">[25, 25]</div>
-            
+
             <!-- Game Over Overlay -->
             <div id="gameOverOverlay" class="game-over-overlay">
                 <div class="game-over-text">GAME OVER</div>
                 <button id="restartButton" class="restart-button">Reiniciar Jogo</button>
             </div>
         </div>
-        
-        <!-- Mapa completo (oculto por padrão) -->
+
+        <!-- Mapa completo (oculto por padrao) -->
         <div id="fullMapContainer" class="modal-container">
             <div class="modal-content map-content">
                 <button id="closeMapBtn" class="close-btn">X</button>
@@ -27,15 +27,15 @@
                 <canvas id="fullMapCanvas"></canvas>
             </div>
         </div>
-        
-        <!-- Modal de Informações do Jogador -->
+
+        <!-- Modal de Informacoes do Jogador -->
         <div id="playerInfoModal" class="modal-container">
             <div class="modal-content">
                 <button id="closeInfoBtn" class="close-btn">X</button>
-                <h2 class="modal-title">Informações do Jogador</h2>
+                <h2 class="modal-title">Informacoes do Jogador</h2>
                 <div class="info-container">
                     <div class="info-row">
-                        <span class="info-label">Nível:</span>
+                        <span class="info-label">Nivel:</span>
                         <span id="infoLevel" class="info-value">1</span>
                     </div>
                     <div class="info-row">
@@ -43,11 +43,11 @@
                         <span id="infoHealth" class="info-value">100/100</span>
                     </div>
                     <div class="info-row">
-                        <span class="info-label">Experiência:</span>
+                        <span class="info-label">Experiencia:</span>
                         <span id="infoXP" class="info-value">0/100</span>
                     </div>
                     <div class="info-row">
-                        <span class="info-label">Dano do Projétil:</span>
+                        <span class="info-label">Dano do Projetil:</span>
                         <span id="infoDamage" class="info-value">20</span>
                     </div>
                     <div class="info-row">
@@ -55,20 +55,20 @@
                         <span id="infoSpeed" class="info-value">5.0</span>
                     </div>
                     <div class="info-row" id="aoeInfoRow">
-                        <span class="info-label">Dano em Área:</span>
+                        <span class="info-label">Dano em Area:</span>
                         <span id="infoAOEDamage" class="info-value">40</span>
                     </div>
                 </div>
             </div>
         </div>
-        
+
         <div class="hud">
             <div class="hud-stats">
                 <div class="level-container">
-                    <div class="level-label">Nível:</div>
+                    <div class="level-label">Nivel:</div>
                     <div class="level-value" id="levelValue">1</div>
                 </div>
-                
+
                 <div class="hp-container">
                     <div class="hp-label">HP:</div>
                     <div class="hp-bar-container">
@@ -76,7 +76,7 @@
                     </div>
                     <div class="hp-value" id="hpValue">100/100</div>
                 </div>
-                
+
                 <div class="xp-container">
                     <div class="xp-label">XP:</div>
                     <div class="xp-bar-container">
@@ -85,30 +85,30 @@
                     <div class="xp-value" id="xpValue">0/100</div>
                 </div>
             </div>
-            
+
             <div class="hud-skills">
                 <!-- Container de poderes -->
                 <div class="powers-container">
-                    <!-- Slot único para poder -->
+                    <!-- Slot unico para poder -->
                     <div class="power" id="power-slot" data-power-id="fireball">
-                        <div class="power-icon">🔥</div>
+                        <div class="power-icon">&#128293;</div>
                         <div class="cooldown-bar">
                             <div id="powerCooldown" class="cooldown"></div>
                             <div id="cooldownText" class="cooldown-text"></div>
                         </div>
-                        <div class="power-name" id="powerName">Tiro de Canhão</div>
+                        <div class="power-name" id="powerName">Tiro de Canhao</div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <!-- Controles do jogo (fora do canvas) -->
     <div class="game-controls-info">
         <div class="controls-section">
             <div class="control-item">
                 <span class="control-key">W A S D</span>
-                <span class="control-desc">Movimentação</span>
+                <span class="control-desc">Movimentacao</span>
             </div>
             <div class="control-item">
                 <span class="control-key">Mouse</span>
@@ -120,17 +120,36 @@
             </div>
         </div>
         <div class="controls-section">
-            <div class="control-item">
+            <button id="mobileInfoButton" class="control-item control-button" type="button">
                 <span class="control-key">I</span>
-                <span class="control-desc">Informações</span>
-            </div>
-            <div class="control-item">
+                <span class="control-desc">Informacoes</span>
+            </button>
+            <button id="mobileMapButton" class="control-item control-button" type="button">
                 <span class="control-key">M</span>
                 <span class="control-desc">Abrir Mapa</span>
+            </button>
+        </div>
+    </div>
+
+    <div id="mobileTouchControls" class="mobile-touch-controls" aria-hidden="true">
+        <div class="mobile-touch-instructions">
+            <span>Esquerda: mover</span>
+            <span>Direita: mirar e atirar</span>
+        </div>
+        <div class="mobile-touch-zones">
+            <div class="touch-zone touch-zone-left" data-stick="left">
+                <div id="leftJoystick" class="touch-joystick">
+                    <div class="touch-joystick-knob"></div>
+                </div>
+            </div>
+            <div class="touch-zone touch-zone-right" data-stick="right">
+                <div id="rightJoystick" class="touch-joystick">
+                    <div class="touch-joystick-knob"></div>
+                </div>
             </div>
         </div>
     </div>
-    
-    <script type="module" src="js/main.js"></script>
+
+    <script type="module" src="/src/core/main.js"></script>
 </body>
-</html> 
+</html>

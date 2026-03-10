@@ -1,4 +1,4 @@
-import { EnemyProjectile } from './projectile.js';
+import { isFiniteNumber, normalizeVector, toFiniteNumber } from '../core/math.js';
 
 export class Enemy {
     constructor(x, y, health, damage, xpValue, type = null, zone = 0, game = null) {
@@ -248,21 +248,17 @@ export class Enemy {
                 // Cria um projétil inimigo
                 if (game) {
                     const projectileSpeed = 3;
-                    
-                    // Criar um projétil válido usando a classe Projectile
-                    const enemyProjectile = new EnemyProjectile(
-                        this.x + this.width/2,
-                        this.y + this.height/2,
+
+                    game.addProjectile(game.createProjectile('enemy', [
+                        this.x + this.width / 2,
+                        this.y + this.height / 2,
                         8,
                         8,
                         Math.cos(angle) * projectileSpeed,
                         Math.sin(angle) * projectileSpeed,
                         this.damage,
                         this.color
-                    );
-                    
-                    // Adicionar o projétil usando o método addProjectile
-                    game.addProjectile(enemyProjectile);
+                    ]));
                 }
                 
                 // Reseta o cooldown
@@ -320,11 +316,12 @@ export class Enemy {
         if (this.type === 'pursuer') {
             const dx = player.x - this.x;
             const dy = player.y - this.y;
-            const distanceToPlayer = Math.sqrt(dx * dx + dy * dy);
+            const direction = normalizeVector(dx, dy, Math.cos(this.moveDirection), Math.sin(this.moveDirection));
+            const distanceToPlayer = Math.hypot(toFiniteNumber(dx, 0), toFiniteNumber(dy, 0));
             
             // Se o jogador estiver dentro do alcance de detecção, persegue-o
             if (distanceToPlayer < this.detectionRange) {
-                this.moveDirection = Math.atan2(dy, dx);
+                this.moveDirection = Math.atan2(direction.y, direction.x);
                 this.rotation = this.moveDirection; // Atualiza a rotação imediatamente
                 this.moveTimer = 0; // Reseta o timer para continuar perseguindo
             }
@@ -347,6 +344,9 @@ export class Enemy {
         
         // Move o inimigo
         const moveSpeed = (this.type === 'pursuer') ? this.speed * 1.2 : this.speed * 0.7;
+        if (!isFiniteNumber(this.moveDirection)) {
+            this.moveDirection = 0;
+        }
         this.x += Math.cos(this.moveDirection) * moveSpeed;
         this.y += Math.sin(this.moveDirection) * moveSpeed;
     }
@@ -611,27 +611,11 @@ export class Enemy {
     }
     
     applyKnockback(directionX, directionY, force) {
-        // Verifica se os parâmetros são números válidos
-        if (isNaN(directionX) || isNaN(directionY) || isNaN(force)) {
-            console.log("Tentativa de aplicar knockback com valores NaN:", {
-                directionX, directionY, force, enemy: this
-            });
-            return; // Não aplica knockback com valores inválidos
-        }
+        const normalizedDirection = normalizeVector(directionX, directionY, 0, -1);
+        const knockbackForce = toFiniteNumber(force, 0);
         
-        // Normaliza a direção para evitar knockbacks extremos
-        const length = Math.sqrt(directionX * directionX + directionY * directionY);
-        if (length > 0) {
-            directionX = directionX / length;
-            directionY = directionY / length;
-        } else {
-            // Se não houver direção, usa uma direção padrão
-            directionX = 0;
-            directionY = -1; // Para cima
-        }
-        
-        this.knockbackX = directionX * force;
-        this.knockbackY = directionY * force;
+        this.knockbackX = normalizedDirection.x * knockbackForce;
+        this.knockbackY = normalizedDirection.y * knockbackForce;
         this.knockbackDuration = 100; // 100ms de knockback
     }
     

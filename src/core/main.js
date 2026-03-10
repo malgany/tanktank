@@ -1,4 +1,4 @@
-import { Game } from './game.js';
+import { Game } from '../engine/game.js';
 
 // Inicializa o jogo quando a página carregar
 window.addEventListener('DOMContentLoaded', () => {

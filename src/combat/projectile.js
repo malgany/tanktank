@@ -1,25 +1,33 @@
+import { toFiniteNumber } from '../core/math.js';
+
 export class Projectile {
     constructor(x, y, width, height, velocityX, velocityY, damage) {
-        this.x = x;
-        this.y = y;
-        this.width = width;
-        this.height = height;
-        this.velocityX = velocityX;
-        this.velocityY = velocityY;
-        this.damage = damage;
-        this.isEnemy = false; // Por padrão, projéteis não são de inimigos
-        
-        // Efeitos visuais
+        this.poolType = 'fireball';
+        this.reset(x, y, width, height, velocityX, velocityY, damage);
+    }
+
+    reset(x, y, width, height, velocityX, velocityY, damage) {
+        this.x = toFiniteNumber(x, 0);
+        this.y = toFiniteNumber(y, 0);
+        this.width = toFiniteNumber(width, 0);
+        this.height = toFiniteNumber(height, 0);
+        this.velocityX = toFiniteNumber(velocityX, 0);
+        this.velocityY = toFiniteNumber(velocityY, 0);
+        this.damage = toFiniteNumber(damage, 0);
+        this.isEnemy = false;
+        this.active = true;
+        this.type = this.poolType;
         this.particles = [];
         this.generateParticles();
-        
-        // Propriedades de ricochete
         this.canRicochet = false;
-        this.ricochetsLeft = 1; // Número de ricochetes permitidos
-        this.hasRicocheted = false; // Se já ricocheteou
+        this.ricochetsLeft = 1;
+        this.hasRicocheted = false;
     }
     
     update(deltaTime) {
+        this.velocityX = toFiniteNumber(this.velocityX, 0);
+        this.velocityY = toFiniteNumber(this.velocityY, 0);
+
         // Move o projétil
         this.x += this.velocityX;
         this.y += this.velocityY;
@@ -207,26 +215,30 @@ export class Projectile {
 export class EnemyProjectile extends Projectile {
     constructor(x, y, width, height, velocityX, velocityY, damage, color) {
         super(x, y, width, height, velocityX, velocityY, damage);
+        this.poolType = 'enemy';
+        this.reset(x, y, width, height, velocityX, velocityY, damage, color);
+    }
+
+    reset(x, y, width, height, velocityX, velocityY, damage, color) {
+        super.reset(x, y, width, height, velocityX, velocityY, damage);
         this.isEnemy = true;
+        this.poolType = 'enemy';
+        this.type = 'enemy';
         this.lifespan = 2000; // Tempo de vida em ms
-        
-        // Cores de fogo para os projéteis inimigos
-        const fireColors = ['#ff3300', '#ff6600', '#ff9900', '#ffcc00']; // Vermelho, laranja, laranja claro, amarelo
-        this.color = fireColors[Math.floor(Math.random() * fireColors.length)]; // Escolhe uma cor aleatória
-        
+        const fireColors = ['#ff3300', '#ff6600', '#ff9900', '#ffcc00'];
+        this.color = color || fireColors[Math.floor(Math.random() * fireColors.length)];
         this.timeAlive = 0;
-        
-        // Adiciona propriedades para efeito de fogo
-        this.pulseRate = 0.1 + Math.random() * 0.2; // Taxa de pulsação
-        this.pulseAmount = 0.2 + Math.random() * 0.3; // Quantidade de pulsação
-        this.pulseOffset = Math.random() * Math.PI * 2; // Deslocamento da pulsação
-        
-        // Rastro de fogo
+        this.pulseRate = 0.1 + Math.random() * 0.2;
+        this.pulseAmount = 0.2 + Math.random() * 0.3;
+        this.pulseOffset = Math.random() * Math.PI * 2;
         this.trail = [];
-        this.trailMaxLength = 10; // Número máximo de posições no rastro
+        this.trailMaxLength = 10;
     }
     
     update(deltaTime) {
+        this.velocityX = toFiniteNumber(this.velocityX, 0);
+        this.velocityY = toFiniteNumber(this.velocityY, 0);
+
         // Salva a posição atual para o rastro
         this.trail.push({
             x: this.x + this.width / 2,
@@ -407,9 +419,16 @@ export class EnemyProjectile extends Projectile {
 export class IceProjectile extends Projectile {
     constructor(x, y, width, height, velocityX, velocityY, damage) {
         super(x, y, width, height, velocityX, velocityY, damage);
+        this.poolType = 'ice';
+        this.reset(x, y, width, height, velocityX, velocityY, damage);
+    }
+
+    reset(x, y, width, height, velocityX, velocityY, damage) {
+        super.reset(x, y, width, height, velocityX, velocityY, damage);
+        this.poolType = 'ice';
         this.type = 'ice';
-        this.slowEffect = 0.5; // Reduz a velocidade do inimigo em 50%
-        this.slowDuration = 3000; // Duração do efeito em ms
+        this.slowEffect = 0.5;
+        this.slowDuration = 3000;
     }
     
     draw(ctx) {
@@ -479,9 +498,16 @@ export class IceProjectile extends Projectile {
 export class PoisonProjectile extends Projectile {
     constructor(x, y, width, height, velocityX, velocityY, damage) {
         super(x, y, width, height, velocityX, velocityY, damage);
+        this.poolType = 'poison';
+        this.reset(x, y, width, height, velocityX, velocityY, damage);
+    }
+
+    reset(x, y, width, height, velocityX, velocityY, damage) {
+        super.reset(x, y, width, height, velocityX, velocityY, damage);
+        this.poolType = 'poison';
         this.type = 'poison';
-        this.poisonDamage = damage; // Usa o dano passado como parâmetro
-        this.poisonDuration = 5000; // Duração em ms (5 segundos)
+        this.poisonDamage = damage;
+        this.poisonDuration = 5000;
     }
     
     draw(ctx) {
@@ -551,10 +577,17 @@ export class PoisonProjectile extends Projectile {
 export class ArrowProjectile extends Projectile {
     constructor(x, y, width, height, velocityX, velocityY, damage, maxDistance) {
         super(x, y, width, height, velocityX, velocityY, damage);
+        this.poolType = 'arrow';
+        this.reset(x, y, width, height, velocityX, velocityY, damage, maxDistance);
+    }
+
+    reset(x, y, width, height, velocityX, velocityY, damage, maxDistance) {
+        super.reset(x, y, width, height, velocityX, velocityY, damage);
+        this.poolType = 'arrow';
         this.type = 'arrow';
         this.startX = x;
         this.startY = y;
-        this.maxDistance = maxDistance; // Distância máxima que a flecha pode percorrer
+        this.maxDistance = maxDistance;
         this.distanceTraveled = 0;
     }
     
@@ -562,6 +595,8 @@ export class ArrowProjectile extends Projectile {
         // Posição anterior
         const oldX = this.x;
         const oldY = this.y;
+        this.velocityX = toFiniteNumber(this.velocityX, 0);
+        this.velocityY = toFiniteNumber(this.velocityY, 0);
         
         // Move o projétil
         this.x += this.velocityX;

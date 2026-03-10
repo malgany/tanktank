@@ -52,6 +52,14 @@ export class UI {
                 cooldownPercent = (player.iceCooldown / player.iceMaxCooldown) * 100;
                 cooldownTime = player.iceCooldown;
                 break;
+            case 'poison':
+                cooldownPercent = (player.poisonCooldown / player.poisonMaxCooldown) * 100;
+                cooldownTime = player.poisonCooldown;
+                break;
+            case 'arrow':
+                cooldownPercent = (player.arrowCooldown / player.arrowMaxCooldown) * 100;
+                cooldownTime = player.arrowCooldown;
+                break;
         }
         
         this.powerCooldown.style.height = `${cooldownPercent}%`;

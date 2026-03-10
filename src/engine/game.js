@@ -1,17 +1,23 @@
-import { Player } from './player.js';
-import { Enemy } from './enemy.js';
+import { Player } from '../entities/player.js';
 import { InputHandler } from './input.js';
-import { Chest } from './chest.js';
-import { Projectile, IceProjectile, PoisonProjectile, ArrowProjectile } from './projectile.js';
-import { AOEEffect } from './aoe.js';
-import { World } from './world.js';
-import { UI } from './ui.js';
-import { CONFIG } from './config.js';
+import { Chest } from '../entities/chest.js';
+import { World } from '../environment/world.js';
+import { UIManager } from '../ui/ui-manager.js';
+import { CONFIG } from '../core/config.js';
+import { isFiniteNumber } from '../core/math.js';
+import { EventBus } from '../core/event-bus.js';
+import { MapManager } from './map-manager.js';
+import { RenderSystem } from './render-system.js';
+import { CombatSystem } from './combat-system.js';
+import { EnemyFactory } from '../entities/enemy-factory.js';
+import { ProjectilePool } from '../combat/projectile-pool.js';
 
 export class Game {
     constructor() {
+        this.eventBus = new EventBus();
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
+        this.boundHandleResize = this.handleResize.bind(this);
         this.setupCanvas();
         
         // Inicializa o mundo primeiro
@@ -26,8 +32,13 @@ export class Game {
         this.currentScreenX = CONFIG.WORLD.INITIAL_SCREEN_X;
         this.currentScreenY = CONFIG.WORLD.INITIAL_SCREEN_Y;
         
+        this.enemyFactory = new EnemyFactory(this);
+        this.projectilePool = new ProjectilePool();
+        this.mapManager = new MapManager(this);
+        this.renderSystem = new RenderSystem(this);
+        this.combatSystem = new CombatSystem(this);
         this.player = new Player(this);
-        this.ui = new UI(this);
+        this.ui = new UIManager(this);
         this.input = new InputHandler(this);
         
         this.enemies = [];
@@ -44,28 +55,7 @@ export class Game {
         this.minChestSpawnInterval = CONFIG.CHEST.MIN_SPAWN_INTERVAL;
         
         // Obtém o tipo de terreno da tela inicial
-        const initialScreenType = this.world.getScreenType(this.currentScreenX, this.currentScreenY);
-        
-        // Define a zona inicial com base no tipo de terreno
-        let initialZone;
-        
-        switch (initialScreenType) {
-            case 'plains':
-                initialZone = 0; // Planície (fácil)
-                break;
-            case 'forest':
-                initialZone = 1; // Floresta (médio)
-                break;
-            case 'mountains':
-                initialZone = 2; // Montanhas (difícil)
-                break;
-            case 'desert':
-                initialZone = 3; // Deserto (muito difícil)
-                break;
-            default:
-                initialZone = 0;
-        }
-        
+        const initialZone = this.mapManager.syncCurrentZone();
         this.currentZone = initialZone; // Zona atual
         this.lastZone = initialZone; // Última zona visitada
         
@@ -88,7 +78,7 @@ export class Game {
         
         // Configurar botão de fechar mapa
         document.getElementById('closeMapBtn').addEventListener('click', () => {
-            this.hideFullMap();
+            this.mapManager.hideFullMap();
         });
         
         // Configuração do modal de informações do jogador
@@ -102,6 +92,7 @@ export class Game {
         
         // Cria o modal de configuração
         this.createConfigModal();
+        this.bindMobileButtons();
         
         // Sistema de alertas temporários
         this.floatingAlerts = [];
@@ -115,7 +106,9 @@ export class Game {
         
         // Carrega as configurações salvas do localStorage
         this.loadConfig();
-        
+        this.eventBus.emit('ui:update');
+        window.addEventListener('resize', this.boundHandleResize);
+
         requestAnimationFrame(this.gameLoop.bind(this));
     }
     
@@ -125,7 +118,37 @@ export class Game {
         this.canvas.width = gameArea.clientWidth;
         this.canvas.height = gameArea.clientHeight;
     }
-    
+
+    handleResize() {
+        this.setupCanvas();
+
+        if (this.fullMapCanvas) {
+            this.fullMapCanvas.width = this.fullMapCanvas.clientWidth || this.fullMapCanvas.width;
+            this.fullMapCanvas.height = this.fullMapCanvas.clientHeight || this.fullMapCanvas.height;
+        }
+    }
+
+    bindMobileButtons() {
+        const infoButton = document.getElementById('mobileInfoButton');
+        const mapButton = document.getElementById('mobileMapButton');
+
+        if (infoButton) {
+            infoButton.addEventListener('click', () => {
+                this.togglePlayerInfo();
+            });
+        }
+
+        if (mapButton) {
+            mapButton.addEventListener('click', () => {
+                if (this.isFullMapVisible) {
+                    this.hideFullMap();
+                } else {
+                    this.showFullMap();
+                }
+            });
+        }
+    }
+
     gameLoop(timestamp) {
         // Calcula o delta time
         if (!this.lastTime) {
@@ -137,11 +160,7 @@ export class Game {
         this.lastTime = timestamp;
         this.gameTime += deltaTime;
         
-        // Limpa o canvas
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Desenha o fundo
-        this.drawBackground();
+        this.renderSystem.beginFrame();
         
         // Atualiza apenas se o jogo não estiver pausado
         if (!this.isPaused) {
@@ -149,13 +168,13 @@ export class Game {
             this.player.update(deltaTime);
             
             // Atualiza os inimigos
-            this.updateEnemies(deltaTime);
+            this.combatSystem.updateEnemies(deltaTime);
             
             // Atualiza os projéteis
-            this.updateProjectiles(deltaTime);
+            this.combatSystem.updateProjectiles(deltaTime);
             
             // Atualiza os efeitos de AOE
-            this.updateAOEEffects(deltaTime);
+            this.combatSystem.updateAOEEffects(deltaTime);
             
             // Atualiza os drops
             this.updateDrops(deltaTime);
@@ -171,21 +190,18 @@ export class Game {
                 console.log("Transição de tela detectada:", transitionResult);
                 
                 // Atualiza a UI após a transição
-                this.ui.update();
+                this.eventBus.emit('ui:update');
                 
                 // Atualiza as coordenadas
-                this.updateCoordinatesDisplay();
+                this.mapManager.updateCoordinatesDisplay();
             }
         }
         
-        // Desenha o jogador
-        this.player.draw(this.ctx);
-        
-        // Atualiza a UI
+        this.renderSystem.renderPlayer();
         this.ui.update();
         
         // Atualiza as coordenadas
-        this.updateCoordinatesDisplay();
+        this.mapManager.updateCoordinatesDisplay();
         
         // Atualiza e desenha os alertas flutuantes
         this.updateFloatingAlerts(deltaTime);
@@ -195,206 +211,19 @@ export class Game {
     }
     
     updateEnemies(deltaTime) {
-        // Primeiro, remove todos os inimigos mortos ou invisíveis
-        const beforeCount = this.enemies.length;
-        
-        // Verifica se há inimigos com coordenadas NaN antes de filtrar
-        for (let i = 0; i < this.enemies.length; i++) {
-            const enemy = this.enemies[i];
-            if (isNaN(enemy.x) || isNaN(enemy.y)) {
-                console.log("Inimigo com coordenadas NaN antes de filtrar:", enemy);
-                enemy.dead = true;
-                enemy.visible = false;
-            }
-        }
-        
-        // Filtra os inimigos mortos ou invisíveis
-        this.enemies = this.enemies.filter(enemy => {
-            // Se o inimigo estiver morto ou invisível, remove-o
-            if (enemy.dead || !enemy.visible) {
-                return false;
-            }
-            
-            // Verifica se as coordenadas são válidas
-            if (isNaN(enemy.x) || isNaN(enemy.y)) {
-                console.log("Inimigo com coordenadas NaN após filtro:", enemy);
-                return false;
-            }
-            
-            return true;
-        });
-        
-        const afterCount = this.enemies.length;
-        if (beforeCount !== afterCount) {
-            console.log(`Removidos ${beforeCount - afterCount} inimigos mortos/invisíveis`);
-        }
-        
-        // Depois, atualiza os inimigos restantes
-        for (let i = this.enemies.length - 1; i >= 0; i--) {
-            const enemy = this.enemies[i];
-
-            // Atualiza o inimigo
-            enemy.update(deltaTime, this.player, this);
-            enemy.draw(this.ctx);
-            
-            // Verifica colisão com o jogador
-            if (this.checkCollision(enemy, this.player)) {
-                // Verifica se o inimigo não está em cooldown de colisão
-                if (enemy.collisionCooldown <= 0) {
-                    // Calcula a direção do knockback (do inimigo para o jogador)
-                    const knockbackX = this.player.x - enemy.x;
-                    const knockbackY = this.player.y - enemy.y;
-                    
-                    // Aplica dano ao jogador com knockback
-                    this.player.takeDamage(enemy.damage, knockbackX, knockbackY);
-                    
-                    // Aplica cooldown de colisão ao inimigo
-                    enemy.applyCollisionCooldown();
-                }
-            }
-            
-            // Mantém o inimigo dentro da tela
-            this.keepEnemyInScreen(enemy);
-        }
-        
-        // Verifica se todos os inimigos foram derrotados
-        if (this.enemies.length === 0) {
-            console.log("Todos os inimigos foram derrotados!");
-            
-            // Verifica se a tela já foi limpa antes
-            if (!this.isScreenCleared(this.currentScreenX, this.currentScreenY)) {
-                console.log("Marcando tela como limpa e verificando spawn de baú...");
-                this.markScreenAsCleared();
-                
-                // Verifica se deve spawnar um baú após limpar a tela
-                this.checkChestSpawn();
-            } else {
-                console.log("Tela já estava marcada como limpa anteriormente.");
-            }
-        }
+        this.combatSystem.updateEnemies(deltaTime);
     }
     
     updateProjectiles(deltaTime) {
-        for (let i = this.projectiles.length - 1; i >= 0; i--) {
-            const projectile = this.projectiles[i];
-            
-            // Verifica se o projétil tem o método update
-            if (!projectile || typeof projectile.update !== 'function') {
-                console.warn('Projétil inválido encontrado:', projectile);
-                this.projectiles.splice(i, 1);
-                continue;
-            }
-            
-            // Atualiza o projétil
-            projectile.update(deltaTime);
-            
-            // Verifica se o projétil saiu da tela
-            if (projectile.x < 0 || projectile.x > this.canvas.width ||
-                projectile.y < 0 || projectile.y > this.canvas.height) {
-                
-                // Se o projétil pode ricocheter e ainda tem ricochetes disponíveis, não o remove
-                if (projectile.canRicochet && projectile.ricochetsLeft > 0) {
-                    continue;
-                }
-                
-                // Remove o projétil
-                this.projectiles.splice(i, 1);
-                continue;
-            }
-            
-            // Verifica se é um projétil inimigo
-            if (projectile.isEnemy) {
-                // Log para depuração
-                // console.log("Processando projétil inimigo:", projectile);
-                
-                // Verifica colisão com o jogador
-                if (this.checkCollision(projectile, this.player)) {
-                    console.log("Projétil inimigo atingiu o jogador!");
-                    
-                    // Aplica dano ao jogador
-                    this.player.takeDamage(projectile.damage);
-                    
-                    // Remove o projétil
-                    this.projectiles.splice(i, 1);
-                    continue;
-                }
-            } else {
-                // Se não for um projétil inimigo, verifica colisão com inimigos
-                for (let j = this.enemies.length - 1; j >= 0; j--) {
-                    const enemy = this.enemies[j];
-                    
-                    if (this.checkCollision(projectile, enemy)) {
-                        // Log para depuração
-                        // console.log("Projétil do jogador atingiu inimigo:", enemy);
-                        
-                        // Aplica dano ao inimigo
-                        enemy.takeDamage(projectile.damage);
-                        
-                        // Se for um projétil de gelo, aplica o efeito de lentidão ou congelamento
-                        if (projectile.type === 'ice') {
-                            // Congela o inimigo usando a duração definida no jogador
-                            this.player.freezeEnemy(enemy, this.player.iceDuration);
-                        }
-                        
-                        // Se for um projétil de veneno, aplica o efeito de envenenamento
-                        if (projectile.type === 'poison') {
-                            // Envenena o inimigo usando o dano do projétil
-                            this.player.poisonEnemy(enemy, projectile.poisonDamage, 5000);
-                        }
-                        
-                        // Remove o projétil
-                        this.projectiles.splice(i, 1);
-                        break;
-                    }
-                }
-            }
-            
-            // Desenha o projétil se ainda existir
-            if (i < this.projectiles.length) {
-                projectile.draw(this.ctx);
-            }
-        }
+        this.combatSystem.updateProjectiles(deltaTime);
     }
     
     updateAOEEffects(deltaTime) {
-        for (let i = this.aoeEffects.length - 1; i >= 0; i--) {
-            const aoe = this.aoeEffects[i];
-            aoe.update(deltaTime);
-            aoe.draw(this.ctx);
-            
-            // Aplica dano aos inimigos dentro da área
-            if (aoe.active && !aoe.damageApplied) {
-                for (const enemy of this.enemies) {
-                    const dx = enemy.x - aoe.x;
-                    const dy = enemy.y - aoe.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    
-                    if (distance < aoe.radius) {
-                        enemy.takeDamage(aoe.damage);
-                    }
-                }
-                aoe.damageApplied = true;
-            }
-            
-            // Remove efeitos expirados
-            if (aoe.duration <= 0) {
-                this.aoeEffects.splice(i, 1);
-            }
-        }
+        this.combatSystem.updateAOEEffects(deltaTime);
     }
     
     checkCollision(obj1, obj2) {
-        // Se obj1 for um baú e obj2 for o jogador, abre o baú
-        if (obj1 instanceof Chest && obj2 === this.player) {
-            obj1.open();
-        }
-        
-        return (
-            obj1.x < obj2.x + obj2.width &&
-            obj1.x + obj1.width > obj2.x &&
-            obj1.y < obj2.y + obj2.height &&
-            obj1.y + obj1.height > obj2.y
-        );
+        return this.combatSystem.checkCollision(obj1, obj2);
     }
     
     checkScreenTransition() {
@@ -480,17 +309,10 @@ export class Game {
             this.currentScreenX = Math.max(0, Math.min(this.currentScreenX, this.world.width - 1));
             this.currentScreenY = Math.max(0, Math.min(this.currentScreenY, this.world.height - 1));
             
-            // Limpa os projéteis e efeitos AOE
-            this.projectiles = [];
-            this.aoeEffects = [];
-            
             // Limpa as marcas de rodas do jogador
             this.player.clearTrackMarks();
             
-            // Limpa os inimigos atuais antes de carregar novos
-            this.enemies = [];
-            this.drops = [];
-            this.chests = []; // Limpa também os baús
+            this.clearScreenEntities();
             
             // Verifica se a tela já foi limpa de inimigos
             if (this.isScreenCleared(this.currentScreenX, this.currentScreenY)) {
@@ -502,11 +324,11 @@ export class Game {
                 if (this.screenEnemies[screenKey]) {
                     // Carrega os inimigos salvos
                     console.log("Carregando inimigos salvos:", screenKey);
-                    this.loadScreenEnemies(this.currentScreenX, this.currentScreenY);
+                    this.mapManager.loadScreenEnemies(this.currentScreenX, this.currentScreenY);
                 } else {
                     // Gera novos inimigos para a tela
                     console.log("Gerando novos inimigos:", screenKey);
-                    this.generateEnemiesForCurrentScreen();
+                    this.mapManager.generateEnemiesForCurrentScreen();
                 }
             }
             
@@ -514,36 +336,14 @@ export class Game {
             this.checkChestSpawn();
             
             // Atualiza a exibição das coordenadas
-            this.updateCoordinatesDisplay();
+            this.mapManager.updateCoordinatesDisplay();
             
             // Exibe uma mensagem informando a nova tela
             const screenType = this.world.getScreenType(this.currentScreenX, this.currentScreenY);
             
             // Define a zona com base no tipo de terreno
-            let newZone;
-            let screenName = '';
-            
-            switch (screenType) {
-                case 'plains':
-                    newZone = 0;
-                    screenName = 'Planície';
-                    break;
-                case 'forest':
-                    newZone = 1;
-                    screenName = 'Floresta';
-                    break;
-                case 'mountains':
-                    newZone = 2;
-                    screenName = 'Montanhas';
-                    break;
-                case 'desert':
-                    newZone = 3;
-                    screenName = 'Deserto';
-                    break;
-                default:
-                    newZone = 0;
-                    screenName = 'Desconhecido';
-            }
+            const newZone = this.mapManager.getZoneForScreenType(screenType);
+            const screenName = this.mapManager.getScreenName(screenType);
             
             // Verifica se houve mudança de zona
             if (newZone !== this.lastZone) {
@@ -566,111 +366,11 @@ export class Game {
     }
     
     generateEnemiesForCurrentScreen() {
-        // Verifica se a tela já foi limpa
-        if (this.isScreenCleared(this.currentScreenX, this.currentScreenY)) {
-            this.enemies = [];
-            return;
-        }
-        
-        // Obtém o tipo de terreno da tela atual
-        const screenType = this.world.getScreenType(this.currentScreenX, this.currentScreenY);
-        
-        // Define a zona de dificuldade com base no tipo de terreno
-        let difficultyZone;
-        
-        switch (screenType) {
-            case 'plains':
-                difficultyZone = 0; // Planície (fácil)
-                break;
-            case 'forest':
-                difficultyZone = 1; // Floresta (médio)
-                break;
-            case 'mountains':
-                difficultyZone = 2; // Montanhas (difícil)
-                break;
-            case 'desert':
-                difficultyZone = 3; // Deserto (muito difícil)
-                break;
-            default:
-                difficultyZone = 0;
-        }
-        
-        this.currentZone = difficultyZone;
-        
-        // Quanto mais difícil a zona, mais inimigos e mais fortes
-        const baseEnemyCount = 2 + difficultyZone;
-        const enemyCount = Math.min(8, baseEnemyCount + Math.floor(Math.random() * 2));
-        
-        // Multiplicador de poder baseado na zona de dificuldade
-        // Zona 0: 1x, Zona 1: 1.5x, Zona 2: 2x, Zona 3: 3x
-        const powerMultiplier = 1 + (difficultyZone * 0.75);
-        
-        console.log(`Gerando ${enemyCount} inimigos na zona ${difficultyZone} (multiplicador: ${powerMultiplier.toFixed(1)}x)`);
-        
-        for (let i = 0; i < enemyCount; i++) {
-            // Evita gerar inimigos muito próximos do jogador
-            let x, y;
-            do {
-                x = Math.random() * (this.canvas.width - 40);
-                y = Math.random() * (this.canvas.height - 40);
-            } while (
-                Math.abs(x - this.player.x) < 100 && 
-                Math.abs(y - this.player.y) < 100
-            );
-            
-            // Adiciona variação aos atributos dos inimigos
-            const variationFactor = 0.8 + Math.random() * 0.4; // 80% a 120% do valor base
-            
-            // Calcula os atributos com base na zona de dificuldade
-            const baseHealth = 20 + (difficultyZone * 15);
-            const baseDamage = 5 + (difficultyZone * 3);
-            const baseXP = 10 + (difficultyZone * 10);
-            
-            // Cria o inimigo passando a zona atual
-            const enemy = new Enemy(
-                x, 
-                y, 
-                Math.floor(baseHealth * powerMultiplier * variationFactor), // HP
-                Math.floor(baseDamage * powerMultiplier * variationFactor), // Dano
-                Math.floor(baseXP * powerMultiplier * variationFactor),     // XP
-                null,                                                       // Tipo (será determinado pelo inimigo)
-                difficultyZone,                                             // Zona
-                this                                                        // Referência ao jogo
-            );
-            
-            // Aumenta o tamanho dos inimigos mais fortes
-            const sizeIncrease = 1 + (difficultyZone * 0.1);
-            enemy.width *= sizeIncrease;
-            enemy.height *= sizeIncrease;
-            
-            this.enemies.push(enemy);
-        }
+        this.mapManager.generateEnemiesForCurrentScreen();
     }
     
     updateCoordinatesDisplay() {
-        // Obtém o tipo de terreno da tela atual
-        const screenType = this.world.getScreenType(this.currentScreenX, this.currentScreenY);
-        let screenName = '';
-        
-        switch (screenType) {
-            case 'plains':
-                screenName = 'Planície';
-                break;
-            case 'forest':
-                screenName = 'Floresta';
-                break;
-            case 'mountains':
-                screenName = 'Montanhas';
-                break;
-            case 'desert':
-                screenName = 'Deserto';
-                break;
-            default:
-                screenName = 'Desconhecido';
-        }
-        
-        // Atualiza a posição do mapa no canto superior esquerdo
-        document.getElementById('mapPosition').textContent = `[${this.currentScreenX}, ${this.currentScreenY}] - ${screenName}`;
+        this.mapManager.updateCoordinatesDisplay();
     }
     
     addProjectile(projectile) {
@@ -680,6 +380,28 @@ export class Game {
             return;
         }
         this.projectiles.push(projectile);
+    }
+
+    createProjectile(type, args) {
+        return this.projectilePool.acquire(type, args);
+    }
+
+    recycleProjectileAt(index) {
+        const [projectile] = this.projectiles.splice(index, 1);
+        if (projectile) {
+            this.projectilePool.release(projectile);
+        }
+    }
+
+    clearScreenEntities() {
+        while (this.projectiles.length > 0) {
+            this.projectilePool.release(this.projectiles.pop());
+        }
+
+        this.enemies = [];
+        this.aoeEffects = [];
+        this.drops = [];
+        this.chests = [];
     }
     
     addAOEEffect(aoe) {
@@ -754,116 +476,7 @@ export class Game {
     }
     
     forceTransition(direction) {
-        console.log("Forçando transição para:", direction);
-        
-        // Verifica se está no deserto e se ainda há inimigos
-        if (this.world.getScreenType(this.currentScreenX, this.currentScreenY) === 'desert' && this.enemies.length > 0) {
-            // Impede a transição e mostra uma mensagem
-            this.ui.showMessage("Elimine todos os inimigos para avançar!", 2000);
-            return null;
-        }
-        
-        // Salva os inimigos da tela atual antes de transicionar
-        this.saveCurrentScreenEnemies();
-        
-        switch(direction) {
-            case 'up':
-                this.currentScreenY--;
-                this.player.y = this.canvas.height - this.player.height - 20;
-                break;
-            case 'down':
-                this.currentScreenY++;
-                this.player.y = 20;
-                break;
-            case 'left':
-                this.currentScreenX--;
-                this.player.x = this.canvas.width - this.player.width - 20;
-                break;
-            case 'right':
-                this.currentScreenX++;
-                this.player.x = 20;
-                break;
-        }
-        
-        // Limita as coordenadas da tela ao tamanho do mundo
-        this.currentScreenX = Math.max(0, Math.min(this.currentScreenX, this.world.width - 1));
-        this.currentScreenY = Math.max(0, Math.min(this.currentScreenY, this.world.height - 1));
-        
-        // Limpa os elementos da tela anterior
-        this.enemies = [];
-        this.projectiles = [];
-        this.aoeEffects = [];
-        this.drops = [];
-        this.chests = []; // Limpa também os baús
-        
-        // Verifica se a tela já foi limpa de inimigos
-        if (this.isScreenCleared(this.currentScreenX, this.currentScreenY)) {
-            // Se a tela já foi limpa, não carrega inimigos
-            console.log("Tela já limpa:", this.currentScreenX, this.currentScreenY);
-        } else {
-            // Verifica se há inimigos salvos para esta tela
-            const screenKey = `${this.currentScreenX},${this.currentScreenY}`;
-            if (this.screenEnemies[screenKey]) {
-                // Carrega os inimigos salvos
-                console.log("Carregando inimigos salvos:", screenKey);
-                this.loadScreenEnemies(this.currentScreenX, this.currentScreenY);
-            } else {
-                // Gera novos inimigos para a tela
-                console.log("Gerando novos inimigos:", screenKey);
-                this.generateEnemiesForCurrentScreen();
-            }
-        }
-        
-        // Verifica se deve gerar um baú na nova tela
-        this.checkChestSpawn();
-        
-        // Atualiza a exibição das coordenadas
-        this.updateCoordinatesDisplay();
-        
-        // Exibe uma mensagem informando a nova tela
-        const screenType = this.world.getScreenType(this.currentScreenX, this.currentScreenY);
-        
-        // Define a zona com base no tipo de terreno
-        let newZone;
-        let screenName = '';
-        
-        switch (screenType) {
-            case 'plains':
-                newZone = 0;
-                screenName = 'Planície';
-                break;
-            case 'forest':
-                newZone = 1;
-                screenName = 'Floresta';
-                break;
-            case 'mountains':
-                newZone = 2;
-                screenName = 'Montanhas';
-                break;
-            case 'desert':
-                newZone = 3;
-                screenName = 'Deserto';
-                break;
-            default:
-                newZone = 0;
-                screenName = 'Desconhecido';
-        }
-        
-        // Verifica se houve mudança de zona
-        if (newZone !== this.lastZone) {
-            // Mostra mensagem apenas se a zona mudou
-            this.ui.showMessage(`Zona ${newZone + 1} - ${screenName}`, 3000);
-        }
-        
-        // Atualiza as zonas
-        this.currentZone = newZone;
-        this.lastZone = newZone;
-        
-        return {
-            newScreen: { x: this.currentScreenX, y: this.currentScreenY },
-            screenType: screenType,
-            direction: direction
-        };
+        return this.mapManager.forceTransition(direction);
     }
     
     // Método para mostrar/ocultar a lista de poderes
@@ -874,22 +487,12 @@ export class Game {
     
     // Método para mostrar o mapa completo
     showFullMap() {
-        this.isFullMapVisible = true;
-        this.fullMapContainer.style.display = 'flex';
-        
-        // Certifica-se de que o canvas do mapa tenha as dimensões corretas
-        setTimeout(() => {
-            // Usar setTimeout para garantir que o container já esteja visível
-            this.fullMapCanvas.width = this.fullMapCanvas.clientWidth;
-            this.fullMapCanvas.height = this.fullMapCanvas.clientHeight;
-            this.drawFullMap();
-        }, 10);
+        this.mapManager.showFullMap();
     }
     
     // Método para esconder o mapa completo
     hideFullMap() {
-        this.isFullMapVisible = false;
-        this.fullMapContainer.style.display = 'none';
+        this.mapManager.hideFullMap();
     }
     
     // Método para mostrar/ocultar as informações do jogador
@@ -1032,124 +635,13 @@ export class Game {
     
     // Método para desenhar o mapa completo
     drawFullMap() {
-        const ctx = this.fullMapCtx;
-        const canvas = this.fullMapCanvas;
-        
-        // Certifica-se de que o canvas tenha as dimensões corretas
-        if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
-            canvas.width = canvas.clientWidth;
-            canvas.height = canvas.clientHeight;
-        }
-        
-        // Limpa o canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Desenha um fundo para garantir que o canvas não fique preto
-        ctx.fillStyle = '#111';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Calcula o tamanho de cada célula do mapa
-        const cellWidth = canvas.width / this.world.width;
-        const cellHeight = canvas.height / this.world.height;
-        
-        // Desenha cada célula do mapa
-        for (let y = 0; y < this.world.height; y++) {
-            for (let x = 0; x < this.world.width; x++) {
-                const screenType = this.world.getScreenType(x, y);
-                const colorVariation = this.world.getScreenColorVariation(x, y);
-                
-                // Define a cor com base no tipo de tela
-                let baseColor;
-                let zone;
-                
-                switch (screenType) {
-                    case 'plains':
-                        baseColor = [120, 200, 80]; // Verde claro
-                        zone = 0;
-                        break;
-                    case 'forest':
-                        baseColor = [34, 139, 34]; // Verde floresta
-                        zone = 1;
-                        break;
-                    case 'mountains':
-                        baseColor = [139, 137, 137]; // Cinza
-                        zone = 2;
-                        break;
-                    case 'desert':
-                        baseColor = [210, 180, 140]; // Bege
-                        zone = 3;
-                        break;
-                    default:
-                        baseColor = [50, 50, 50]; // Cinza escuro (vazio)
-                        zone = 0;
-                }
-                
-                // Aplica a variação de cor
-                const adjustedColor = baseColor.map(c => {
-                    const adjusted = c * (1 + colorVariation);
-                    return Math.max(0, Math.min(255, adjusted));
-                });
-                
-                // Desenha a célula
-                ctx.fillStyle = `rgb(${adjustedColor[0]}, ${adjustedColor[1]}, ${adjustedColor[2]})`;
-                ctx.fillRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight);
-                
-                // Adiciona uma borda para melhor visualização
-                ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
-                ctx.strokeRect(x * cellWidth, y * cellHeight, cellWidth, cellHeight);
-                
-                // Se a tela foi limpa, adiciona uma marca
-                if (this.isScreenCleared(x, y)) {
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-                    ctx.beginPath();
-                    ctx.arc(
-                        (x + 0.5) * cellWidth,
-                        (y + 0.5) * cellHeight,
-                        cellWidth / 4,
-                        0,
-                        Math.PI * 2
-                    );
-                    ctx.fill();
-                }
-            }
-        }
-        
-        // Desenha a posição atual do jogador
-        ctx.fillStyle = '#3498db'; // Azul (cor do jogador)
-        ctx.beginPath();
-        ctx.arc(
-            (this.currentScreenX + 0.5) * cellWidth,
-            (this.currentScreenY + 0.5) * cellHeight,
-            Math.max(cellWidth / 2, 5), // Garante um tamanho mínimo visível
-            0,
-            Math.PI * 2
-        );
-        ctx.fill();
-        
-        // Adiciona uma borda branca para destacar
-        ctx.strokeStyle = 'white';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        
-        // Adiciona um ponto central para melhor visualização
-        ctx.fillStyle = 'white';
-        ctx.beginPath();
-        ctx.arc(
-            (this.currentScreenX + 0.5) * cellWidth,
-            (this.currentScreenY + 0.5) * cellHeight,
-            Math.max(cellWidth / 6, 2), // Garante um tamanho mínimo visível
-            0,
-            Math.PI * 2
-        );
-        ctx.fill();
+        this.mapManager.drawFullMap();
     }
     
     // Método para manter os inimigos dentro da tela atual
     keepEnemyInScreen(enemy) {
         // Verifica se as coordenadas são válidas
-        if (isNaN(enemy.x) || isNaN(enemy.y)) {
-            console.log("Tentando manter inimigo com coordenadas NaN dentro da tela:", enemy);
-            // Corrige as coordenadas para evitar problemas
+        if (!isFiniteNumber(enemy.x) || !isFiniteNumber(enemy.y)) {
             enemy.x = this.canvas.width / 2;
             enemy.y = this.canvas.height / 2;
             return;
@@ -1217,69 +709,12 @@ export class Game {
     
     // Salva os inimigos da tela atual
     saveCurrentScreenEnemies() {
-        const screenKey = `${this.currentScreenX},${this.currentScreenY}`;
-        
-        // Salva apenas se houver inimigos na tela atual
-        if (this.enemies.length > 0) {
-            this.screenEnemies[screenKey] = this.enemies.map(enemy => ({
-                x: enemy.x,
-                y: enemy.y,
-                health: enemy.health,
-                maxHealth: enemy.maxHealth,
-                damage: enemy.damage,
-                xpValue: enemy.xpValue,
-                behavior: enemy.behavior,
-                shape: enemy.shape,
-                color: enemy.color,
-                width: enemy.width,
-                height: enemy.height,
-                type: enemy.type,
-                zone: enemy.zone
-            }));
-        } else {
-            // Se não há inimigos, verifica se a tela já foi limpa
-            if (!this.isScreenCleared(this.currentScreenX, this.currentScreenY)) {
-                // Se não foi limpa e não há inimigos, marca como limpa
-                this.markScreenAsCleared();
-            }
-            
-            // Remove os inimigos salvos para esta tela, se houver
-            if (this.screenEnemies[screenKey]) {
-                delete this.screenEnemies[screenKey];
-            }
-        }
+        this.mapManager.saveCurrentScreenEnemies();
     }
     
     // Carrega os inimigos da tela especificada
     loadScreenEnemies(x, y) {
-        const screenKey = `${x},${y}`;
-        if (this.screenEnemies[screenKey]) {
-            this.enemies = this.screenEnemies[screenKey].map(data => {
-                const enemy = new Enemy(
-                    data.x,
-                    data.y,
-                    data.health,
-                    data.damage,
-                    data.xpValue,
-                    data.type,  // Passando o tipo
-                    data.zone,  // Passando a zona
-                    this        // Passando a referência ao jogo
-                );
-                
-                // Restaura as propriedades adicionais
-                enemy.maxHealth = data.maxHealth;
-                enemy.behavior = data.behavior;
-                enemy.shape = data.shape;
-                enemy.color = data.color;
-                enemy.width = data.width;
-                enemy.height = data.height;
-                
-                return enemy;
-            });
-            
-            // Não remove da memória após carregar, mantém os inimigos salvos
-            // para que não sejam gerados novamente se o jogador voltar
-        }
+        this.mapManager.loadScreenEnemies(x, y);
     }
     
     // Método para desenhar a lista de poderes (não é mais necessário, agora é HTML)
@@ -1289,8 +724,7 @@ export class Game {
     
     // Método para desenhar o fundo da tela atual
     drawBackground() {
-        // Desenha o mundo
-        this.world.draw(this.ctx, this.canvas, this.currentScreenX, this.currentScreenY);
+        this.renderSystem.beginFrame();
     }
     
     // Método para verificar se deve spawnar um baú

@@ -1,0 +1,27 @@
+{
+  "name": "tanktank",
+  "version": "1.0.0",
+  "description": "Um jogo de RPG simples desenvolvido com HTML5, JavaScript e CSS, utilizando Canvas para renderização dos elementos gráficos.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/malgany/tanktank.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/malgany/tanktank/issues"
+  },
+  "homepage": "https://github.com/malgany/tanktank#readme",
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1"
+  }
+}

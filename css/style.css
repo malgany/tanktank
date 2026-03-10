@@ -994,6 +994,13 @@ canvas {
     padding: 4px 8px;
 }
 
+.control-button {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
 .control-key {
     font-weight: bold;
     color: #fff;
@@ -1020,4 +1027,228 @@ canvas {
 
 .control-item:hover .control-desc {
     color: #ddd;
-} 
+}
+
+.mobile-touch-controls {
+    display: none;
+}
+
+.mobile-touch-instructions {
+    display: none;
+}
+
+.mobile-touch-zones {
+    display: none;
+}
+
+.touch-zone {
+    position: relative;
+}
+
+.touch-joystick {
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    margin-left: -60px;
+    margin-top: -60px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.04) 72%, rgba(255, 255, 255, 0) 100%);
+    opacity: 0;
+    transform: scale(0.9);
+    transition: opacity 0.12s ease-out, transform 0.12s ease-out;
+    pointer-events: none;
+}
+
+.touch-joystick.active {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.touch-joystick-knob {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 54px;
+    height: 54px;
+    margin-left: -27px;
+    margin-top: -27px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.34);
+    border: 2px solid rgba(255, 255, 255, 0.68);
+    box-shadow: 0 0 18px rgba(0, 0, 0, 0.22);
+    transform: translate(0, 0);
+}
+
+@media (max-width: 900px) and (hover: none) and (pointer: coarse) {
+    body {
+        justify-content: flex-start;
+        align-items: stretch;
+        min-height: 100dvh;
+        padding: 0;
+        background: #111;
+    }
+
+    .game-container {
+        width: 100vw;
+        height: auto;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+        overflow: visible;
+    }
+
+    .game-area {
+        flex: none;
+        width: 100%;
+        aspect-ratio: 1 / 1;
+    }
+
+    canvas {
+        touch-action: none;
+    }
+
+    .hud {
+        height: auto;
+        min-height: 72px;
+        padding: 10px 12px 14px;
+        flex-wrap: wrap;
+        gap: 10px;
+        border-top: 0;
+    }
+
+    .hud-stats {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+    }
+
+    .hp-container,
+    .xp-container,
+    .level-container {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+
+    .hp-bar-container,
+    .xp-bar-container {
+        width: auto;
+        flex: 1;
+        min-width: 90px;
+    }
+
+    .hud-skills {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .map-position {
+        top: 8px;
+        left: 8px;
+        min-width: 0;
+        font-size: 12px;
+    }
+
+    .game-controls-info {
+        width: 100vw;
+        margin: 0;
+        padding: 12px;
+        border: 0;
+        border-top: 1px solid #2e2e2e;
+        border-radius: 0;
+        box-shadow: none;
+        background: linear-gradient(180deg, rgba(26, 26, 26, 0.96), rgba(18, 18, 18, 0.98));
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .controls-section {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .controls-section:last-child {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .control-item {
+        padding: 10px 8px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .control-button {
+        background: rgba(52, 152, 219, 0.14);
+        border: 1px solid rgba(52, 152, 219, 0.35);
+    }
+
+    .control-button:active {
+        background: rgba(52, 152, 219, 0.24);
+        transform: scale(0.98);
+    }
+
+    .control-key {
+        width: 100%;
+        text-align: center;
+        font-size: 13px;
+        padding: 6px 4px;
+    }
+
+    .control-desc {
+        margin-top: 4px;
+        text-align: center;
+    }
+
+    .mobile-touch-controls {
+        display: flex;
+        flex-direction: column;
+        min-height: max(220px, calc(100dvh - 100vw - 170px));
+        background: linear-gradient(180deg, #151515 0%, #0b0b0b 100%);
+        border-top: 1px solid #242424;
+    }
+
+    .mobile-touch-instructions {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 14px 6px;
+        color: #7f8c8d;
+        font-size: 12px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .mobile-touch-zones {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        flex: 1;
+        min-height: 220px;
+    }
+
+    .touch-zone {
+        min-height: 220px;
+        border-top: 1px solid rgba(255, 255, 255, 0.04);
+        touch-action: none;
+        user-select: none;
+    }
+
+    .touch-zone-left {
+        border-right: 1px solid rgba(255, 255, 255, 0.05);
+        background: radial-gradient(circle at center, rgba(46, 204, 113, 0.08), rgba(0, 0, 0, 0) 60%);
+    }
+
+    .touch-zone-right {
+        background: radial-gradient(circle at center, rgba(52, 152, 219, 0.08), rgba(0, 0, 0, 0) 60%);
+    }
+
+    .modal-content {
+        width: min(92vw, 400px);
+    }
+
+    .map-content {
+        width: 94vw;
+        height: min(76dvh, 620px);
+    }
+}

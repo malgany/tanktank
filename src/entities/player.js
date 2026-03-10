@@ -1,6 +1,6 @@
-import { Projectile, IceProjectile, PoisonProjectile, ArrowProjectile } from './projectile.js';
-import { AOEEffect } from './aoe.js';
-import { CONFIG } from './config.js';
+import { AOEEffect } from '../combat/aoe.js';
+import { CONFIG } from '../core/config.js';
+import { normalizeVector, toFiniteNumber } from '../core/math.js';
 
 export class Player {
     constructor(game) {
@@ -41,6 +41,7 @@ export class Player {
         this.aoeCooldown = 0;
         this.aoeMaxCooldown = CONFIG.PLAYER.AOE_MAX_COOLDOWN; // 3 segundos
         this.iceCooldown = 0;
+        this.iceMaxCooldown = CONFIG.PLAYER.ICE_MAX_COOLDOWN;
         this.poisonCooldown = 0;
         this.poisonMaxCooldown = CONFIG.PLAYER.POISON_MAX_COOLDOWN; // 1.5 segundos
         this.arrowCooldown = 0;
@@ -195,78 +196,28 @@ export class Player {
         
         // Reduz os cooldowns dos poderes
         if (this.fireballCooldown > 0) {
-            // Aplica o multiplicador de cooldown se estiver ativo
             this.fireballCooldown -= deltaTime * (1 / this.cooldownMultiplier);
             if (this.fireballCooldown < 0) this.fireballCooldown = 0;
-            
-            // Atualiza a UI do cooldown se este for o poder atual
-            if (this.currentPower === 'fireball') {
-                const cooldownPercent = (this.fireballCooldown / this.availablePowers.find(p => p.id === 'fireball').maxCooldown) * 100;
-                const powerCooldown = document.getElementById('powerCooldown');
-                if (powerCooldown) {
-                    powerCooldown.style.height = `${cooldownPercent}%`;
-                }
-            }
         }
         
         if (this.aoeCooldown > 0) {
-            // Aplica o multiplicador de cooldown se estiver ativo
             this.aoeCooldown -= deltaTime * (1 / this.cooldownMultiplier);
             if (this.aoeCooldown < 0) this.aoeCooldown = 0;
-            
-            // Atualiza a UI do cooldown se este for o poder atual
-            if (this.currentPower === 'aoe') {
-                const cooldownPercent = (this.aoeCooldown / this.availablePowers.find(p => p.id === 'aoe').maxCooldown) * 100;
-                const powerCooldown = document.getElementById('powerCooldown');
-                if (powerCooldown) {
-                    powerCooldown.style.height = `${cooldownPercent}%`;
-                }
-            }
         }
         
         if (this.iceCooldown > 0) {
-            // Aplica o multiplicador de cooldown se estiver ativo
             this.iceCooldown -= deltaTime * (1 / this.cooldownMultiplier);
             if (this.iceCooldown < 0) this.iceCooldown = 0;
-            
-            // Atualiza a UI do cooldown se este for o poder atual
-            if (this.currentPower === 'ice') {
-                const cooldownPercent = (this.iceCooldown / this.availablePowers.find(p => p.id === 'ice').maxCooldown) * 100;
-                const powerCooldown = document.getElementById('powerCooldown');
-                if (powerCooldown) {
-                    powerCooldown.style.height = `${cooldownPercent}%`;
-                }
-            }
         }
         
         if (this.poisonCooldown > 0) {
-            // Aplica o multiplicador de cooldown se estiver ativo
             this.poisonCooldown -= deltaTime * (1 / this.cooldownMultiplier);
             if (this.poisonCooldown < 0) this.poisonCooldown = 0;
-            
-            // Atualiza a UI do cooldown se este for o poder atual
-            if (this.currentPower === 'poison') {
-                const cooldownPercent = (this.poisonCooldown / this.availablePowers.find(p => p.id === 'poison').maxCooldown) * 100;
-                const powerCooldown = document.getElementById('powerCooldown');
-                if (powerCooldown) {
-                    powerCooldown.style.height = `${cooldownPercent}%`;
-                }
-            }
         }
         
         if (this.arrowCooldown > 0) {
-            // Aplica o multiplicador de cooldown se estiver ativo
             this.arrowCooldown -= deltaTime * (1 / this.cooldownMultiplier);
             if (this.arrowCooldown < 0) this.arrowCooldown = 0;
-            
-            // Atualiza a UI do cooldown se este for o poder atual
-            if (this.currentPower === 'arrow') {
-                const cooldownPercent = (this.arrowCooldown / this.availablePowers.find(p => p.id === 'arrow').maxCooldown) * 100;
-                const powerCooldown = document.getElementById('powerCooldown');
-                if (powerCooldown) {
-                    powerCooldown.style.height = `${cooldownPercent}%`;
-                }
-            }
         }
         
         // Atualiza os inimigos congelados
@@ -508,15 +459,15 @@ export class Player {
             
             // Pequeno atraso para cada projétil adicional
             setTimeout(() => {
-                const projectile = new Projectile(
-                    x, 
-                    y, 
-                    this.fireballSize, 
-                    this.fireballSize, 
-                    adjustedVelocityX, 
-                    adjustedVelocityY, 
+                const projectile = this.game.createProjectile('fireball', [
+                    x,
+                    y,
+                    this.fireballSize,
+                    this.fireballSize,
+                    adjustedVelocityX,
+                    adjustedVelocityY,
                     this.fireballDamage
-                );
+                ]);
                 
                 // Aplica ricochete se o jogador tiver a habilidade
                 if (this.hasRicochet) {
@@ -603,15 +554,15 @@ export class Player {
             
             // Pequeno atraso para cada projétil adicional
             setTimeout(() => {
-                const iceProjectile = new IceProjectile(
-                    x, 
-                    y, 
-                    this.iceSize, 
-                    this.iceSize, 
-                    adjustedVelocityX, 
-                    adjustedVelocityY, 
-                    this.fireballDamage * 0.7 // Dano um pouco menor que a bola de fogo
-                );
+                const iceProjectile = this.game.createProjectile('ice', [
+                    x,
+                    y,
+                    this.iceSize,
+                    this.iceSize,
+                    adjustedVelocityX,
+                    adjustedVelocityY,
+                    this.fireballDamage * 0.7
+                ]);
                 
                 // Aplica ricochete se o jogador tiver a habilidade
                 if (this.hasRicochet) {
@@ -643,35 +594,22 @@ export class Player {
         // Torna o jogador invulnerável por um curto período
         this.invulnerableTime = 1000; // 1 segundo de invulnerabilidade
         
-        // Atualiza a UI
-        this.game.ui.update();
+        this.game.eventBus.emit('player:stats-changed');
         
         // Verifica se o jogador morreu
         if (this.health <= 0) {
             console.log("Jogador morreu!");
-            // Mostra a tela de game over
-            const gameOverOverlay = document.getElementById('gameOverOverlay');
-            gameOverOverlay.classList.add('visible');
-            
-            // Adiciona evento de clique ao botão de reiniciar
-            const restartButton = document.getElementById('restartButton');
-            restartButton.addEventListener('click', () => {
-                location.reload(); // Recarrega a página para reiniciar o jogo
-            });
+            this.game.eventBus.emit('game:over');
         }
     }
     
     applyKnockback(directionX, directionY, force) {
-        // Normaliza a direção
-        const length = Math.sqrt(directionX * directionX + directionY * directionY);
-        if (length > 0) {
-            directionX /= length;
-            directionY /= length;
-        }
+        const normalizedDirection = normalizeVector(directionX, directionY, 0, 0);
+        const knockbackForce = toFiniteNumber(force, 0);
         
         // Aplica o knockback
-        this.knockbackX = directionX * force;
-        this.knockbackY = directionY * force;
+        this.knockbackX = normalizedDirection.x * knockbackForce;
+        this.knockbackY = normalizedDirection.y * knockbackForce;
         this.knockbackDuration = 200; // 200ms de knockback
     }
     
@@ -693,10 +631,7 @@ export class Player {
             }
         }
         
-        // Atualiza a UI
-        const xpPercent = (this.xp / this.xpToNextLevel) * 100;
-        document.getElementById('xpBar').style.width = `${xpPercent}%`;
-        document.getElementById('xpValue').textContent = `${this.xp}/${this.xpToNextLevel}`;
+        this.game.eventBus.emit('player:stats-changed');
     }
     
     levelUp() {
@@ -718,11 +653,8 @@ export class Player {
         console.log(`Novo dano: ${this.fireballDamage}`);
         console.log(`Nova velocidade: ${this.speed.toFixed(1)}`);
         
-        // Notifica a UI sobre o level up
-        this.game.ui.showLevelUp(this.level);
-        
-        // Atualiza a UI
-        this.game.ui.update();
+        this.game.eventBus.emit('player:level-up', { level: this.level });
+        this.game.eventBus.emit('player:stats-changed');
     }
     
     // Limpa todas as marcas de rodas
@@ -818,24 +750,9 @@ export class Player {
     
     // Método para atualizar o slot de poder na UI
     updatePowerSlotUI() {
-        const powerSlot = document.getElementById('power-slot');
-        const powerIcon = powerSlot.querySelector('.power-icon');
-        const cooldownBar = powerSlot.querySelector('#powerCooldown');
-        const powerName = document.getElementById('powerName');
-        
-        // Encontra o poder atual
         const power = this.availablePowers.find(p => p.id === this.currentPower);
         
         if (power) {
-            // Atualiza o ID do poder
-            powerSlot.setAttribute('data-power-id', power.id);
-            
-            // Atualiza o ícone
-            powerIcon.textContent = power.icon;
-            
-            // Atualiza o nome do poder
-            powerName.textContent = power.name;
-            
             // Atualiza a descrição com informações sobre o tamanho
             if (power.id === 'fireball') {
                 power.description = `Dispara uma bola de fogo na direção do cursor (Tamanho: ${this.fireballSize})`;
@@ -844,12 +761,9 @@ export class Player {
             } else if (power.id === 'aoe') {
                 power.description = `Cria uma explosão que causa dano em área (Raio: ${this.aoeSize})`;
             }
-            
-            // Adiciona classes específicas do poder
-            powerSlot.className = 'power';
-            powerSlot.classList.add(`${power.id}-power`);
-            powerSlot.classList.add('selected');
         }
+
+        this.game.eventBus.emit('player:power-changed', { powerId: this.currentPower });
     }
     
     // Método para trocar o poder atual
@@ -858,7 +772,7 @@ export class Player {
         if (this.currentPower !== newPowerId) {
             this.currentPower = newPowerId;
             this.updatePowerSlotUI();
-            this.game.ui.showMessage(`Poder alterado para: ${this.getPowerName(newPowerId)}`, 2000);
+            this.game.eventBus.emit('ui:message', { message: `Poder alterado para: ${this.getPowerName(newPowerId)}`, duration: 2000 });
             
             // Atualiza as informações do jogador se a tela de informações estiver aberta
             if (this.game.isPlayerInfoVisible) {
@@ -1047,15 +961,15 @@ export class Player {
             
             // Pequeno atraso para cada projétil adicional
             setTimeout(() => {
-                const poisonProjectile = new PoisonProjectile(
-                    x, 
-                    y, 
-                    this.poisonSize, 
-                    this.poisonSize, 
-                    adjustedVelocityX, 
-                    adjustedVelocityY, 
-                    this.poisonDamage // Usa o dano específico do veneno
-                );
+                const poisonProjectile = this.game.createProjectile('poison', [
+                    x,
+                    y,
+                    this.poisonSize,
+                    this.poisonSize,
+                    adjustedVelocityX,
+                    adjustedVelocityY,
+                    this.poisonDamage
+                ]);
                 
                 // Aplica ricochete se o jogador tiver a habilidade
                 if (this.hasRicochet) {
@@ -1094,8 +1008,7 @@ export class Player {
         const y = centerY + Math.sin(this.angle) * distance - 5; // -5 para centralizar o projétil
         
         // Calcula a distância máxima (metade da tela)
-        const canvas = document.getElementById('gameCanvas');
-        const maxDistance = Math.min(canvas.width, canvas.height) / 2;
+        const maxDistance = Math.min(this.game.canvas.width, this.game.canvas.height) / 2;
         
         // Cria múltiplas flechas com base no multiplicador de poder
         for (let i = 0; i < this.powerMultiplier; i++) {
@@ -1106,16 +1019,16 @@ export class Player {
             
             // Pequeno atraso para cada projétil adicional
             setTimeout(() => {
-                const arrowProjectile = new ArrowProjectile(
-                    x, 
-                    y, 
-                    this.arrowSize, 
-                    this.arrowSize, 
-                    adjustedVelocityX, 
-                    adjustedVelocityY, 
-                    this.arrowDamage, // Usa o dano específico das flechas
-                    maxDistance // Distância máxima que a flecha pode percorrer
-                );
+                const arrowProjectile = this.game.createProjectile('arrow', [
+                    x,
+                    y,
+                    this.arrowSize,
+                    this.arrowSize,
+                    adjustedVelocityX,
+                    adjustedVelocityY,
+                    this.arrowDamage,
+                    maxDistance
+                ]);
                 
                 // Aplica ricochete se o jogador tiver a habilidade
                 if (this.hasRicochet) {
@@ -1158,6 +1071,7 @@ export class Player {
         this.game.createFloatingAlert(`DANO +${amount}`, this.x + this.width / 2, this.y - 20, '#ff0000');
         
         // Mostra uma mensagem
-        this.game.ui.showMessage(`Dano aumentado em ${amount}!`, 3000);
+        this.game.eventBus.emit('ui:message', { message: `Dano aumentado em ${amount}!`, duration: 3000 });
     }
 } 
+
