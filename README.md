@@ -1,84 +1,72 @@
-# RPG Canvas
+# TankTank
 
-Um jogo de RPG simples desenvolvido com HTML5, JavaScript e CSS, utilizando Canvas para renderização dos elementos gráficos.
+TankTank é um jogo de ação e exploração em visão superior, feito com Canvas, JavaScript e CSS. Você controla um tanque, atravessa um mundo dividido em telas, enfrenta outros tanques, sobe de nível e encontra baús com novos poderes e melhorias.
 
-## Sobre o Jogo
+## Como o jogo funciona
 
-Neste jogo, você controla um personagem que explora um mundo dividido em múltiplas "telas" ou mapas, formando uma grade 50x50. Cada tela representa uma área do mapa com características próprias, como planícies, florestas, montanhas e desertos.
+O mundo atual tem 25 × 25 telas (625 áreas) e começa na coordenada `[12, 12]`. As regiões ficam mais perigosas conforme o jogador se afasta do centro:
 
-## Características Principais
+1. Planície — região inicial e mais fácil.
+2. Floresta — mais inimigos e maior variedade.
+3. Montanhas — inimigos mais resistentes e perseguidores mais frequentes.
+4. Deserto — região externa e mais difícil.
 
-### Mundo
-- O mundo é dividido em telas de 1x1 (Canvas), conectadas em uma grade 50x50.
-- Cada tela tem características próprias (cor, elementos de cenário).
-- Ao chegar na borda de uma tela, o personagem transiciona para a tela adjacente.
+O mapa completo mostra a posição atual e marca as telas já limpas. Inimigos que continuam vivos mantêm vida, posição e tipo quando o jogador sai da tela e volta durante a mesma partida.
 
-### Personagem
-- Inicia no nível 1.
-- Tem uma barra de vida (HP) visível no HUD.
-- Pode usar um ataque de fogo (fireball) ao pressionar a Barra de Espaço.
-- Ao atingir o nível 5, desbloqueia um poder de fogo em área (AOE) que pode ser usado pressionando Shift + Espaço.
+## Inimigos
 
-### Inimigos
-- Cada tela pode conter até 3 inimigos.
-- Os inimigos se movem e causam dano ao jogador por contato.
-- Quando derrotados, fornecem XP para o jogador.
-- Quanto mais longe do centro do mapa, mais fortes são os inimigos.
+Existem três comportamentos de tanque inimigo:
 
-### Sistema de Níveis
-- O jogador ganha XP ao derrotar inimigos.
-- Ao acumular XP suficiente, o jogador sobe de nível.
-- A cada nível, o jogador fica mais forte.
-- No nível 5, desbloqueia o ataque em área.
+- Quebrado: fica parado, não atira e solta fumaça.
+- Aleatório: circula em direções variáveis e atira quando o jogador se aproxima.
+- Perseguidor: detecta, segue e atira no jogador dentro do seu alcance.
+
+As zonas externas geram mais inimigos, aumentam vida, dano e XP, e elevam a chance de encontrar perseguidores.
+
+## Poderes e progressão
+
+Cada partida começa com um dos cinco poderes escolhido aleatoriamente:
+
+- Tiro de Canhão: disparo rápido e direto.
+- Gelo: causa dano e congela inimigos.
+- Ataque em Área: explode na direção da mira e atinge vários alvos.
+- Veneno: aplica dano ao longo do tempo.
+- Flechas: disparos rápidos com alcance limitado.
+
+Ao derrotar inimigos, o jogador ganha XP. Subir de nível recupera a vida, aumenta a vida máxima, a velocidade e o dano dos poderes.
+
+Telas limpas podem gerar baús. Eles oferecem troca ou melhoria de poder, mais projéteis, ricochete e redução permanente do tempo de recarga. Inimigos também podem deixar bônus de vida, velocidade ou dano.
+
+## Objetivo atual
+
+O protótipo ainda não tem chefe final, condição de vitória, missões ou conclusão narrativa. O ciclo atual é aberto: explorar, limpar telas, fortalecer o tanque, alcançar regiões mais difíceis e sobreviver o máximo possível. A morte encerra a partida e permite reiniciar.
 
 ## Controles
 
-- **W**: Mover para cima
-- **A**: Mover para a esquerda
-- **S**: Mover para baixo
-- **D**: Mover para a direita
-- **Espaço**: Usar ataque de fogo (fireball)
-- **Shift + Espaço**: Usar ataque em área (disponível a partir do nível 5)
+- `W`, `A`, `S`, `D`: movimentar.
+- Mouse: mirar.
+- Clique esquerdo: usar o poder atual.
+- `I`: abrir informações do jogador.
+- `M`: abrir o mapa do mundo.
+- `P`: mostrar o resumo das melhorias coletadas.
+- `*`: abrir as configurações avançadas do protótipo.
 
-## Como Jogar
-
-1. Abra o arquivo `index.html` em um navegador moderno.
-2. Use as teclas WASD para mover o personagem pelo mundo.
-3. Pressione Espaço para atacar inimigos com bolas de fogo.
-4. Derrote inimigos para ganhar XP e subir de nível.
-5. Ao atingir o nível 5, você desbloqueia o ataque em área (Shift + Espaço).
-6. Explore o mundo e veja até onde consegue chegar!
+Em telas menores, o jogo exibe dois controles virtuais: o esquerdo movimenta e o direito mira e atira.
 
 ## Desenvolvimento
 
-Este jogo foi desenvolvido utilizando:
-- HTML5 Canvas para renderização
-- JavaScript para lógica do jogo
-- CSS para estilização da interface
+Requisitos: Node.js e npm.
 
-A estrutura do projeto é modular, com arquivos separados para cada componente do jogo:
-- `game.js`: Controla o loop principal do jogo
-- `player.js`: Gerencia o personagem do jogador
-- `enemy.js`: Controla os inimigos
-- `world.js`: Gerencia o mundo e suas telas
-- `projectile.js`: Controla os projéteis (bolas de fogo)
-- `aoe.js`: Gerencia os efeitos de área
-- `input.js`: Processa a entrada do usuário
-- `ui.js`: Atualiza a interface do usuário
+```bash
+npm install
+npm run dev
+```
 
-## Arquivo de Configuração
+Verificações disponíveis:
 
-O jogo agora possui um arquivo de configuração centralizado em `js/config.js`. Este arquivo contém todas as constantes e valores de configuração do jogo, incluindo:
+```bash
+npm run build
+npx tsc --noEmit
+```
 
-- Configurações do Mundo (tamanho, posição inicial)
-- Configurações do Jogador (atributos, poderes)
-- Configurações de Baús (chance de spawn, intervalo)
-- Configurações de Inimigos (quantidade base, multiplicador de poder)
-
-Para ajustar os valores e personalizar o jogo, basta editar este arquivo. Os valores também continuam sendo configuráveis pela interface do jogo através do modal de configurações.
-
-O arquivo `config.js` também possui métodos para salvar e carregar configurações do localStorage, o que permite persistência das configurações entre sessões.
-
-## Divirta-se!
-
-Explore o mundo, derrote inimigos e veja até onde consegue chegar. Boa sorte! 
+O progresso da partida existe apenas em memória. Recarregar a página reinicia mapa explorado, nível, itens e inimigos; somente as configurações avançadas são mantidas no `localStorage`.

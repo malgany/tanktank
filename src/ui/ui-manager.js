@@ -50,6 +50,10 @@ export class UIManager {
         this.ui.showLevelUp(level);
     }
 
+    showPowerInfo() {
+        this.ui.showPowerInfo();
+    }
+
     renderPowerSlot() {
         const player = this.game.player;
         const power = player.availablePowers.find((entry) => entry.id === player.currentPower);
@@ -63,6 +67,9 @@ export class UIManager {
         }
 
         this.powerSlot.setAttribute('data-power-id', power.id);
+        this.powerSlot.setAttribute('role', 'img');
+        this.powerSlot.setAttribute('aria-label', `Poder atual: ${power.name}`);
+        this.powerSlot.title = power.name;
         this.powerSlot.className = 'power';
         this.powerSlot.classList.add(`${power.id}-power`, 'selected');
 
@@ -80,6 +87,7 @@ export class UIManager {
             return;
         }
 
+        this.game.isPaused = true;
         this.gameOverOverlay.classList.add('visible');
         if (this.restartButton && !this.restartButton.dataset.boundReload) {
             this.restartButton.dataset.boundReload = 'true';

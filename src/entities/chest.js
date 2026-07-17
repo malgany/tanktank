@@ -269,9 +269,11 @@ export class Chest {
                     this.game.showPowerSwapModal(this.itemType);
                 } else {
                     // Se for o mesmo poder, aumenta o dano do veneno
-                    this.game.player.increaseDamage(2);
+                    this.game.player.poisonDamage += 2;
+                    this.game.player.powerStats.poisonDamage = (this.game.player.powerStats.poisonDamage || 0) + 2;
+                    this.game.player.powerStats.poisonDamageUpgrades = (this.game.player.powerStats.poisonDamageUpgrades || 0) + 1;
                     this.game.ui.showMessage(`Veneno melhorado! Dano aumentado!`, 3000);
-                    this.game.createFloatingAlert(`DANO +2`, this.x, this.y - 40, '#ff00ff');
+                    this.game.createFloatingAlert(`VENENO +2/s`, this.x, this.y - 40, '#ff00ff');
                 }
                 break;
                 
@@ -299,4 +301,4 @@ export class Chest {
                 break;
         }
     }
-} 
+}

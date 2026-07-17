@@ -29,7 +29,7 @@ export class MapManager {
     getScreenName(screenType) {
         switch (screenType) {
             case 'plains':
-                return 'Planície';
+                return 'PlanÃ­cie';
             case 'forest':
                 return 'Floresta';
             case 'mountains':
@@ -219,7 +219,7 @@ export class MapManager {
     /** @param {'up' | 'down' | 'left' | 'right'} direction */
     forceTransition(direction) {
         if (this.game.world.getScreenType(this.game.currentScreenX, this.game.currentScreenY) === 'desert' && this.game.enemies.length > 0) {
-            this.game.ui.showMessage('Elimine todos os inimigos para avançar!', 2000);
+            this.game.ui.showMessage('Elimine todos os inimigos para avanÃ§ar!', 2000);
             return null;
         }
 

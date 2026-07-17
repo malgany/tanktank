@@ -53,6 +53,7 @@ export class Game {
         // Configurações de baús
         this.chestSpawnChance = CONFIG.CHEST.SPAWN_CHANCE;
         this.minChestSpawnInterval = CONFIG.CHEST.MIN_SPAWN_INTERVAL;
+        this.lastChestSpawnTime = Number.NEGATIVE_INFINITY;
         
         // Obtém o tipo de terreno da tela inicial
         const initialZone = this.mapManager.syncCurrentZone();
@@ -131,6 +132,7 @@ export class Game {
     bindMobileButtons() {
         const infoButton = document.getElementById('mobileInfoButton');
         const mapButton = document.getElementById('mobileMapButton');
+        const powerInfoButton = document.getElementById('powerInfoButton');
 
         if (infoButton) {
             infoButton.addEventListener('click', () => {
@@ -145,6 +147,12 @@ export class Game {
                 } else {
                     this.showFullMap();
                 }
+            });
+        }
+
+        if (powerInfoButton) {
+            powerInfoButton.addEventListener('click', () => {
+                this.ui.showPowerInfo();
             });
         }
     }
@@ -429,7 +437,7 @@ export class Game {
                         this.createFloatingAlert(`+${drop.value} VEL`, drop.x, drop.y - 20, '#00ff00');
                         break;
                     case 'damage':
-                        this.player.fireballDamage += drop.value;
+                        this.player.increaseDamage(drop.value, false);
                         this.ui.showMessage(`Dano +${drop.value}!`, 2000);
                         // Cria um alerta flutuante
                         this.createFloatingAlert(`+${drop.value} DANO`, drop.x, drop.y - 20, '#ff9900');
@@ -567,70 +575,40 @@ export class Game {
         if (infoHealth) infoHealth.textContent = `${player.health}/${player.maxHealth}`;
         if (infoXP) infoXP.textContent = `${player.xp}/${player.xpToNextLevel}`;
         
-        // Atualiza o rótulo e valor do dano com base no poder atual
-        const damageLabel = this.playerInfoModal.querySelector('.info-row:nth-child(4) .info-label');
+        // Atualiza o rótulo e o valor de acordo com o efeito principal do poder.
+        const damageLabel = document.getElementById('powerInfoLabel');
         const currentPower = player.availablePowers.find(p => p.id === player.currentPower);
-        
-        if (damageLabel && currentPower) {
-            damageLabel.textContent = `${currentPower.name}:`;
-        }
-        
+
         if (infoDamage) {
             switch (player.currentPower) {
                 case 'fireball':
+                    if (damageLabel) damageLabel.textContent = 'Dano do Canhão:';
                     infoDamage.textContent = player.fireballDamage;
                     break;
                 case 'aoe':
+                    if (damageLabel) damageLabel.textContent = 'Dano em Área:';
                     infoDamage.textContent = player.aoeDamage;
                     break;
                 case 'ice':
-                    infoDamage.textContent = (player.iceDuration / 1000).toFixed(1) + 's';
+                    if (damageLabel) damageLabel.textContent = 'Gelo (dano / duração):';
+                    infoDamage.textContent = `${player.iceDamage} / ${(player.iceDuration / 1000).toFixed(1)}s`;
                     break;
                 case 'poison':
+                    if (damageLabel) damageLabel.textContent = 'Dano do Veneno:';
                     infoDamage.textContent = player.poisonDamage.toFixed(1) + '/s';
                     break;
                 case 'arrow':
+                    if (damageLabel) damageLabel.textContent = 'Dano das Flechas:';
                     infoDamage.textContent = player.arrowDamage;
                     break;
                 default:
+                    if (damageLabel && currentPower) damageLabel.textContent = `${currentPower.name}:`;
                     infoDamage.textContent = player.fireballDamage;
             }
         }
         
         if (infoSpeed) infoSpeed.textContent = player.speed.toFixed(1);
         
-        // Atualiza o dano em área e mostra/oculta a linha com base no desbloqueio
-        const aoeInfoRow = document.getElementById('aoeInfoRow');
-        if (aoeInfoRow) {
-            if (player.currentPower === 'aoe') {
-                const infoAOEDamage = document.getElementById('infoAOEDamage');
-                if (infoAOEDamage) infoAOEDamage.textContent = player.aoeDamage;
-                aoeInfoRow.style.display = 'flex';
-            } else {
-                aoeInfoRow.style.display = 'none';
-            }
-        }
-        
-        // Atualiza o dano do veneno e mostra/oculta a linha com base no desbloqueio
-        const iceInfoRow = document.getElementById('iceInfoRow');
-        if (iceInfoRow) {
-            if (player.currentPower === 'ice') {
-                const infoIceDuration = document.getElementById('infoIceDuration');
-                if (infoIceDuration) infoIceDuration.textContent = (player.iceDuration / 1000).toFixed(1) + 's';
-                iceInfoRow.style.display = 'flex';
-            } else if (player.currentPower === 'poison') {
-                // Renomeia a linha para exibir informações de veneno
-                const infoLabel = iceInfoRow.querySelector('.info-label');
-                if (infoLabel) infoLabel.textContent = 'Dano do Veneno:';
-                
-                const infoIceDuration = document.getElementById('infoIceDuration');
-                if (infoIceDuration) infoIceDuration.textContent = player.poisonDamage.toFixed(1) + '/s';
-                
-                iceInfoRow.style.display = 'flex';
-            } else {
-                iceInfoRow.style.display = 'none';
-            }
-        }
     }
     
     // Método para desenhar o mapa completo
@@ -727,16 +705,20 @@ export class Game {
         this.renderSystem.beginFrame();
     }
     
-    // Método para verificar se deve spawnar um baú
+    // Método para verificar se deve gerar um baú
     checkChestSpawn() {
-        // Chance de 30% de spawnar um baú após matar todos os inimigos
-        const randomValue = Math.random();
-        
-        if (randomValue < 0.3) {
+        if (!this.isScreenCleared(this.currentScreenX, this.currentScreenY)) {
+            return;
+        }
+
+        const timeSinceLastChest = this.gameTime - this.lastChestSpawnTime;
+        const canSpawn = this.chests.length === 0 && timeSinceLastChest >= this.minChestSpawnInterval;
+
+        if (canSpawn && Math.random() < this.chestSpawnChance) {
             console.log("Baú gerado após eliminar todos os inimigos!");
             
             // Spawna um baú em uma posição aleatória na tela (não muito perto das bordas)
-            const margin = 100; // Margem para evitar que o baú fique muito perto das bordas
+            const margin = Math.min(100, this.canvas.width / 4, this.canvas.height / 4);
             const x = margin + Math.random() * (this.canvas.width - 2 * margin);
             const y = margin + Math.random() * (this.canvas.height - 2 * margin);
             
@@ -770,7 +752,7 @@ export class Game {
     // Método para forçar a geração de um baú
     forceChestSpawn() {
         // Spawna um baú em uma posição aleatória na tela (não muito perto das bordas)
-        const margin = 100; // Margem para evitar que o baú fique muito perto das bordas
+        const margin = Math.min(100, this.canvas.width / 4, this.canvas.height / 4);
         const x = margin + Math.random() * (this.canvas.width - 2 * margin);
         const y = margin + Math.random() * (this.canvas.height - 2 * margin);
         
@@ -830,20 +812,12 @@ export class Game {
                         <span id="infoXP" class="info-value">0/100</span>
                     </div>
                     <div class="info-row">
-                        <span class="info-label">Dano do Projétil:</span>
+                        <span id="powerInfoLabel" class="info-label">Efeito do Poder:</span>
                         <span id="infoDamage" class="info-value">20</span>
                     </div>
                     <div class="info-row">
                         <span class="info-label">Velocidade:</span>
                         <span id="infoSpeed" class="info-value">5.0</span>
-                    </div>
-                    <div class="info-row" id="aoeInfoRow">
-                        <span class="info-label">Dano em Área:</span>
-                        <span id="infoAOEDamage" class="info-value">40</span>
-                    </div>
-                    <div class="info-row" id="iceInfoRow">
-                        <span class="info-label">Duração do Gelo:</span>
-                        <span id="infoIceDuration" class="info-value">3.0s</span>
                     </div>
                 </div>
             </div>
@@ -1145,8 +1119,8 @@ export class Game {
                                     </tr>
                                     <tr>
                                         <td>Gelo</td>
-                                        <td><input type="number" id="iceCooldown" value="2000"></td>
-                                        <td><input type="number" id="iceDamage" value="${this.player.fireballDamage * 0.7}"></td>
+                                        <td><input type="number" id="iceCooldown" value="${this.player.iceMaxCooldown}"></td>
+                                        <td><input type="number" id="iceDamage" value="${this.player.iceDamage}"></td>
                                         <td><input type="number" id="iceSize" value="${this.player.iceSize}"></td>
                                     </tr>
                                     <tr>
@@ -1530,9 +1504,8 @@ export class Game {
         
         // Verifica se os elementos existem antes de tentar definir seus valores
         if (document.getElementById('iceCooldown')) {
-            const icePower = this.player.availablePowers.find(p => p.id === 'ice');
-            document.getElementById('iceCooldown').value = icePower ? icePower.maxCooldown : 2000;
-            document.getElementById('iceDamage').value = this.player.fireballDamage * 0.7;
+            document.getElementById('iceCooldown').value = this.player.iceMaxCooldown;
+            document.getElementById('iceDamage').value = this.player.iceDamage;
             document.getElementById('iceSize').value = this.player.iceSize;
             document.getElementById('iceFreezeTime').value = this.player.iceDuration;
         }
@@ -1606,8 +1579,14 @@ export class Game {
         // Gelo
         const iceCooldown = parseInt(document.getElementById('iceCooldown').value);
         if (!isNaN(iceCooldown)) {
+            this.player.iceMaxCooldown = iceCooldown;
             const icePower = this.player.availablePowers.find(p => p.id === 'ice');
             if (icePower) icePower.maxCooldown = iceCooldown;
+        }
+
+        const iceDamage = parseFloat(document.getElementById('iceDamage').value);
+        if (!isNaN(iceDamage)) {
+            this.player.iceDamage = iceDamage;
         }
         
         const iceSize = parseInt(document.getElementById('iceSize').value);
@@ -1696,6 +1675,10 @@ export class Game {
                 fireballMaxCooldown: this.player.fireballMaxCooldown,
                 fireballDamage: this.player.fireballDamage,
                 fireballSize: this.player.fireballSize,
+                iceMaxCooldown: this.player.iceMaxCooldown,
+                iceDamage: this.player.iceDamage,
+                iceSize: this.player.iceSize,
+                iceDuration: this.player.iceDuration,
                 aoeMaxCooldown: this.player.aoeMaxCooldown,
                 aoeDamage: this.player.aoeDamage,
                 aoeSize: this.player.aoeSize,
@@ -1744,6 +1727,11 @@ export class Game {
         this.player.fireballMaxCooldown = CONFIG.PLAYER.FIREBALL_MAX_COOLDOWN;
         this.player.fireballDamage = CONFIG.PLAYER.FIREBALL_DAMAGE;
         this.player.fireballSize = CONFIG.PLAYER.FIREBALL_SIZE;
+
+        this.player.iceMaxCooldown = CONFIG.PLAYER.ICE_MAX_COOLDOWN;
+        this.player.iceDamage = CONFIG.PLAYER.ICE_DAMAGE;
+        this.player.iceSize = CONFIG.PLAYER.ICE_SIZE;
+        this.player.iceDuration = CONFIG.PLAYER.ICE_DURATION;
         
         this.player.aoeMaxCooldown = CONFIG.PLAYER.AOE_MAX_COOLDOWN;
         this.player.aoeDamage = CONFIG.PLAYER.AOE_DAMAGE;
@@ -1760,6 +1748,9 @@ export class Game {
         // Atualiza os poderes disponíveis
         const fireballPower = this.player.availablePowers.find(p => p.id === 'fireball');
         if (fireballPower) fireballPower.maxCooldown = CONFIG.PLAYER.FIREBALL_MAX_COOLDOWN;
+
+        const icePower = this.player.availablePowers.find(p => p.id === 'ice');
+        if (icePower) icePower.maxCooldown = CONFIG.PLAYER.ICE_MAX_COOLDOWN;
         
         const aoePower = this.player.availablePowers.find(p => p.id === 'aoe');
         if (aoePower) aoePower.maxCooldown = CONFIG.PLAYER.AOE_MAX_COOLDOWN;

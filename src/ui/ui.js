@@ -76,17 +76,12 @@ export class UI {
     }
     
     showMessage(message, duration = 3000) {
-        // Verifica se a mensagem é de passagem de nível
-        if (message.includes("Nível") && message.includes("alcançado")) {
-            // Adiciona a mensagem à fila
-            this.messageQueue.push({ message, duration });
-            
-            // Se não estiver mostrando uma mensagem, inicia o processo
-            if (!this.isShowingMessage) {
-                this.processMessageQueue();
-            }
+        // Todas as mensagens usam a mesma fila para não se sobreporem.
+        this.messageQueue.push({ message, duration });
+
+        if (!this.isShowingMessage) {
+            this.processMessageQueue();
         }
-        // Ignora todas as outras mensagens
     }
     
     processMessageQueue() {
@@ -131,6 +126,11 @@ export class UI {
     // Método para mostrar informações do poder atual
     showPowerInfo() {
         const player = this.game.player;
+        let displayedUpgradeCount = 0;
+        const damageBonus = player.powerStats.damageBonus || 0;
+        const damageUpgrades = player.powerStats.damageUpgrades || 0;
+        const poisonDamageBonus = player.powerStats.poisonDamage || 0;
+        const poisonDamageUpgrades = player.powerStats.poisonDamageUpgrades || 0;
         
         // Cria uma tabela HTML para mostrar o resumo dos poderes
         let tableHTML = `
@@ -145,6 +145,7 @@ export class UI {
         
         // Adiciona linha para o multiplicador de poder
         if (player.powerStats.powerMultiplier > 0) {
+            displayedUpgradeCount++;
             tableHTML += `
                 <tr>
                     <td>Poder +1</td>
@@ -155,6 +156,7 @@ export class UI {
         
         // Adiciona linha para o ricochete
         if (player.powerStats.ricochet > 0) {
+            displayedUpgradeCount++;
             tableHTML += `
                 <tr>
                     <td>Ricochete</td>
@@ -165,11 +167,49 @@ export class UI {
         
         // Adiciona linha para a redução de cooldown
         if (player.powerStats.cooldownReduction > 0) {
+            displayedUpgradeCount++;
             tableHTML += `
                 <tr>
                     <td>Redução de Cooldown</td>
                     <td>${player.powerStats.cooldownReduction}</td>
                     <td>${player.powerStats.totalCooldownReduction.toFixed(1)}%</td>
+                </tr>`;
+        }
+
+        if (player.powerStats.iceDuration > 0) {
+            displayedUpgradeCount++;
+            tableHTML += `
+                <tr>
+                    <td>Congelamento</td>
+                    <td>${player.powerStats.iceDuration / 500}</td>
+                    <td>+${(player.powerStats.iceDuration / 1000).toFixed(1)}s</td>
+                </tr>`;
+        }
+
+        if (damageBonus > 0) {
+            displayedUpgradeCount++;
+            tableHTML += `
+                <tr>
+                    <td>Dano Geral</td>
+                    <td>${damageUpgrades}</td>
+                    <td>+${damageBonus.toFixed(1)}<br><small>Veneno: +${(damageBonus * 0.5).toFixed(1)}/s</small></td>
+                </tr>`;
+        }
+
+        if (poisonDamageBonus > 0) {
+            displayedUpgradeCount++;
+            tableHTML += `
+                <tr>
+                    <td>Veneno Específico</td>
+                    <td>${poisonDamageUpgrades}</td>
+                    <td>+${poisonDamageBonus.toFixed(1)}/s</td>
+                </tr>`;
+        }
+
+        if (displayedUpgradeCount === 0) {
+            tableHTML += `
+                <tr>
+                    <td colspan="3">Nenhuma melhoria coletada nesta partida.</td>
                 </tr>`;
         }
         

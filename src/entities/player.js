@@ -49,6 +49,7 @@ export class Player {
         
         // Dano das habilidades
         this.fireballDamage = CONFIG.PLAYER.FIREBALL_DAMAGE;
+        this.iceDamage = CONFIG.PLAYER.ICE_DAMAGE;
         this.aoeDamage = CONFIG.PLAYER.AOE_DAMAGE;
         this.poisonDamage = CONFIG.PLAYER.POISON_DAMAGE; // Dano por segundo do veneno
         this.arrowDamage = CONFIG.PLAYER.ARROW_DAMAGE; // Dano das flechas
@@ -102,7 +103,7 @@ export class Player {
                 description: 'Dispara um projétil de gelo que congela os inimigos',
                 icon: '❄️',
                 cooldown: 0,
-                maxCooldown: 2000
+                maxCooldown: this.iceMaxCooldown
             },
             {
                 id: 'aoe',
@@ -149,8 +150,11 @@ export class Player {
             ricochet: 0,
             cooldownReduction: 0,
             totalCooldownReduction: 0,
+            damageBonus: 0,
+            damageUpgrades: 0,
             iceDuration: 0,
             poisonDamage: 0,
+            poisonDamageUpgrades: 0,
             arrowDamage: 0,
             aoeDamage: 0
         };
@@ -561,7 +565,7 @@ export class Player {
                     this.iceSize,
                     adjustedVelocityX,
                     adjustedVelocityY,
-                    this.fireballDamage * 0.7
+                    this.iceDamage
                 ]);
                 
                 // Aplica ricochete se o jogador tiver a habilidade
@@ -592,7 +596,7 @@ export class Player {
         this.applyKnockback(knockbackX, knockbackY, 3); // Reduzido para 3 (era 5)
         
         // Torna o jogador invulnerável por um curto período
-        this.invulnerableTime = 1000; // 1 segundo de invulnerabilidade
+        this.invulnerableTime = this.invulnerableDuration;
         
         this.game.eventBus.emit('player:stats-changed');
         
@@ -620,15 +624,10 @@ export class Player {
         // Cria um alerta flutuante para o XP ganho
         this.game.createFloatingAlert(`+${amount} XP`, this.x + this.width / 2, this.y - 20, '#ffff00');
         
-        // Verifica se subiu de nível
-        if (this.xp >= this.xpToNextLevel) {
-            // Corrigido: Agora só sobe um nível por vez para evitar pular níveis
+        // Consome o limite atual antes de calcular o próximo, preservando o excedente.
+        while (this.xp >= this.xpToNextLevel) {
+            this.xp -= this.xpToNextLevel;
             this.levelUp();
-            // Ajusta o XP excedente para o próximo nível
-            if (this.xp > this.xpToNextLevel) {
-                const excessXP = this.xp - this.xpToNextLevel;
-                this.xp = excessXP;
-            }
         }
         
         this.game.eventBus.emit('player:stats-changed');
@@ -643,6 +642,10 @@ export class Player {
         this.maxHealth += 10;
         this.health = this.maxHealth; // Recupera toda a vida ao subir de nível
         this.fireballDamage += 2;
+        this.iceDamage += 2;
+        this.aoeDamage += 2;
+        this.arrowDamage += 2;
+        this.poisonDamage += 1;
         this.speed += 0.1;
         
         // Cria um alerta flutuante para o level up
@@ -1050,10 +1053,12 @@ export class Player {
     /**
      * Aumenta o dano de todos os poderes
      * @param {number} amount - Quantidade de dano a ser aumentada
+     * @param {boolean} showFeedback - Se deve criar alertas próprios para a melhoria
      */
-    increaseDamage(amount) {
+    increaseDamage(amount, showFeedback = true) {
         // Aumenta o dano de todos os poderes
         this.fireballDamage += amount;
+        this.iceDamage += amount;
         this.aoeDamage += amount;
         this.arrowDamage += amount;
         
@@ -1061,11 +1066,16 @@ export class Player {
         // O veneno causa dano ao longo do tempo, então o aumento é menor
         this.poisonDamage += amount * 0.5;
         
-        // Atualiza as estatísticas
-        this.powerStats.poisonDamage += amount * 0.5;
+        // Registra como bônus geral, sem confundir com melhorias específicas de veneno.
+        this.powerStats.damageBonus = (this.powerStats.damageBonus || 0) + amount;
+        this.powerStats.damageUpgrades = (this.powerStats.damageUpgrades || 0) + 1;
         
         // Atualiza a UI
         this.updatePowerSlotUI();
+
+        if (!showFeedback) {
+            return;
+        }
         
         // Cria um alerta flutuante
         this.game.createFloatingAlert(`DANO +${amount}`, this.x + this.width / 2, this.y - 20, '#ff0000');

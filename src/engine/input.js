@@ -125,7 +125,7 @@ export class InputHandler {
         }
 
         if (event.key === '0') {
-            console.log('PosiÃ§Ã£o atual:', window.debugGame.getCurrentPosition());
+            console.log('Posição atual:', window.debugGame.getCurrentPosition());
             return;
         }
 

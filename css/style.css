@@ -338,7 +338,7 @@ canvas {
     cursor: not-allowed;
 }
 
-.power-icon {
+.power-item > .power-icon {
     width: 40px;
     height: 40px;
     background-color: #444;
@@ -350,17 +350,17 @@ canvas {
     margin-right: 15px;
 }
 
-.power-info {
+.power-item .power-info {
     flex: 1;
 }
 
-.power-name {
+.power-item .power-name {
     font-weight: bold;
     color: white;
     margin-bottom: 5px;
 }
 
-.power-description {
+.power-item .power-description {
     font-size: 12px;
     color: #aaa;
 }
@@ -518,7 +518,7 @@ canvas {
     cursor: not-allowed;
 }
 
-.power-icon {
+.power-item > .power-icon {
     width: 40px;
     height: 40px;
     background-color: #444;
@@ -530,17 +530,17 @@ canvas {
     margin-right: 15px;
 }
 
-.power-info {
+.power-item .power-info {
     flex: 1;
 }
 
-.power-name {
+.power-item .power-name {
     font-weight: bold;
     color: white;
     margin-bottom: 5px;
 }
 
-.power-description {
+.power-item .power-description {
     font-size: 12px;
     color: #aaa;
 }
@@ -589,7 +589,7 @@ canvas {
     display: flex;
     justify-content: center;
     align-items: center;
-    cursor: pointer;
+    cursor: default;
     transition: all 0.2s;
     overflow: hidden;
     box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
@@ -600,8 +600,14 @@ canvas {
     box-shadow: 0 0 10px rgba(255, 204, 0, 0.7);
 }
 
-.power-icon {
-    font-size: 24px;
+.power > .power-icon {
+    width: auto;
+    height: auto;
+    margin: 0;
+    border-radius: 0;
+    background: transparent;
+    font-size: 26px;
+    line-height: 1;
     z-index: 2;
 }
 
@@ -644,22 +650,8 @@ canvas {
     transform: scale(0.95);
 }
 
-.power-name {
-    position: absolute;
-    bottom: -25px;
-    left: 0;
-    width: 100%;
-    text-align: center;
-    font-size: 12px;
-    color: white;
-    text-shadow: 1px 1px 2px black;
-    opacity: 0;
-    transition: opacity 0.2s, bottom 0.2s;
-}
-
-.power:hover .power-name {
-    opacity: 1;
-    bottom: -20px;
+.power > .power-name {
+    display: none;
 }
 
 /* Estilos específicos para cada tipo de poder */
@@ -707,14 +699,14 @@ canvas {
     margin-bottom: 10px;
 }
 
-.power-name {
+.power-display .power-name {
     font-size: 18px;
     font-weight: bold;
     margin-bottom: 10px;
     color: #FFF;
 }
 
-.power-description {
+.power-display .power-description {
     font-size: 14px;
     color: #CCC;
 }
@@ -886,7 +878,7 @@ canvas {
     animation: pulse 1.5s infinite;
 }
 
-.power-icon {
+#powerSwapModal .power-icon {
     font-size: 36px;
     margin-bottom: 10px;
     width: 60px;
@@ -898,7 +890,7 @@ canvas {
     background-color: rgba(0, 0, 0, 0.5);
 }
 
-.power-description {
+#powerSwapModal .power-description {
     margin: 20px 0;
     color: #ccc;
     font-style: italic;
@@ -1170,7 +1162,7 @@ canvas {
     }
 
     .controls-section:last-child {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 
     .control-item {

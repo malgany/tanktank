@@ -17,7 +17,7 @@ export class CombatSystem {
         this.game.enemies = this.game.enemies.filter((enemy) => !enemy.dead && enemy.visible && isFiniteNumber(enemy.x) && isFiniteNumber(enemy.y));
 
         if (beforeCount !== this.game.enemies.length) {
-            console.log(`Removidos ${beforeCount - this.game.enemies.length} inimigos mortos/invisíveis`);
+            console.log(`Removidos ${beforeCount - this.game.enemies.length} inimigos mortos/invisÃ­veis`);
         }
 
         for (let i = this.game.enemies.length - 1; i >= 0; i--) {

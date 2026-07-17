@@ -7,15 +7,17 @@ export class World {
     
     generateWorld() {
         const screens = [];
+        const centerX = (this.width - 1) / 2;
+        const centerY = (this.height - 1) / 2;
         
         // Cria uma matriz 2D para armazenar os tipos de tela
         for (let y = 0; y < this.height; y++) {
             const row = [];
             for (let x = 0; x < this.width; x++) {
-                // Calcula a distância do centro (12,12)
+                // Calcula a distância do centro do mundo.
                 const distanceFromCenter = Math.sqrt(
-                    Math.pow(x - 12, 2) + 
-                    Math.pow(y - 12, 2)
+                    Math.pow(x - centerX, 2) +
+                    Math.pow(y - centerY, 2)
                 );
                 
                 // Define o tipo de tela com base na distância
@@ -31,7 +33,7 @@ export class World {
                 }
                 
                 // Adiciona uma pequena variação de cor para cada tela
-                const colorVariation = Math.random() * 0.2 - 0.1; // -0.1 a 0.1
+                const colorVariation = (this.hashCoordinates(x, y) / 0xffffffff) * 0.2 - 0.1;
                 
                 row.push({
                     type: type,
@@ -43,6 +45,21 @@ export class World {
         }
         
         return screens;
+    }
+
+    hashCoordinates(x, y) {
+        let hash = Math.imul(x + 1, 374761393) ^ Math.imul(y + 1, 668265263);
+        hash ^= Math.imul(this.width, 1442695041) ^ Math.imul(this.height, 1274126177);
+        hash = Math.imul(hash ^ (hash >>> 13), 1274126177);
+        return (hash ^ (hash >>> 16)) >>> 0;
+    }
+
+    createSeededRandom(seed) {
+        let state = seed >>> 0;
+        return () => {
+            state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+            return state / 0x100000000;
+        };
     }
     
     getScreenType(x, y) {
@@ -97,10 +114,10 @@ export class World {
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         // Desenha elementos adicionais com base no tipo de tela
-        this.drawScreenElements(ctx, canvas, screenType, adjustedColor);
+        this.drawScreenElements(ctx, canvas, screenType, adjustedColor, screenX, screenY);
     }
     
-    drawScreenElements(ctx, canvas, screenType, baseColor) {
+    drawScreenElements(ctx, canvas, screenType, baseColor, screenX, screenY) {
         // Número de elementos a desenhar
         let elementCount = 0;
         
@@ -121,35 +138,35 @@ export class World {
                 return; // Nada a desenhar
         }
         
-        // Gera uma seed para posicionamento consistente dos elementos
-        const seed = this.width * this.height;
+        // Cada tela recebe seu próprio cenário, estável entre frames e recarregamentos.
+        const random = this.createSeededRandom(this.hashCoordinates(screenX, screenY));
         
         // Desenha os elementos
         for (let i = 0; i < elementCount; i++) {
-            const x = (Math.sin(seed * i) * 0.5 + 0.5) * canvas.width;
-            const y = (Math.cos(seed * i * 1.5) * 0.5 + 0.5) * canvas.height;
+            const x = random() * canvas.width;
+            const y = random() * canvas.height;
             
             switch (screenType) {
                 case 'plains':
-                    this.drawGrass(ctx, x, y, baseColor);
+                    this.drawGrass(ctx, x, y, baseColor, random);
                     break;
                 case 'forest':
                     this.drawTree(ctx, x, y, baseColor);
                     break;
                 case 'mountains':
-                    this.drawRock(ctx, x, y, baseColor);
+                    this.drawRock(ctx, x, y, baseColor, random);
                     break;
                 case 'desert':
-                    this.drawCactus(ctx, x, y, baseColor);
+                    this.drawCactus(ctx, x, y, baseColor, random);
                     break;
             }
         }
     }
     
-    drawGrass(ctx, x, y, baseColor) {
+    drawGrass(ctx, x, y, baseColor, random) {
         // Desenha um tufo de grama
-        const height = 10 + Math.random() * 10;
-        const width = 5 + Math.random() * 5;
+        const height = 10 + random() * 10;
+        const width = 5 + random() * 5;
         
         // Cor mais clara que o fundo
         ctx.fillStyle = `rgb(${baseColor[0] + 30}, ${baseColor[1] + 30}, ${baseColor[2]})`;
@@ -182,9 +199,9 @@ export class World {
         ctx.fill();
     }
     
-    drawRock(ctx, x, y, baseColor) {
+    drawRock(ctx, x, y, baseColor, random) {
         // Desenha uma rocha (polígono irregular)
-        const size = 15 + Math.random() * 15;
+        const size = 15 + random() * 15;
         
         // Cor mais escura que o fundo
         ctx.fillStyle = `rgb(${baseColor[0] - 30}, ${baseColor[1] - 30}, ${baseColor[2] - 30})`;
@@ -200,9 +217,9 @@ export class World {
         ctx.fill();
     }
     
-    drawCactus(ctx, x, y, baseColor) {
+    drawCactus(ctx, x, y, baseColor, random) {
         // Desenha um cacto
-        const height = 20 + Math.random() * 20;
+        const height = 20 + random() * 20;
         
         // Cor mais escura que o fundo
         ctx.fillStyle = `rgb(${baseColor[0] - 50}, ${baseColor[1] + 20}, ${baseColor[2] - 50})`;
@@ -211,12 +228,12 @@ export class World {
         ctx.fillRect(x - 5, y, 10, height);
         
         // Braços (50% de chance para cada braço)
-        if (Math.random() > 0.5) {
+        if (random() > 0.5) {
             ctx.fillRect(x - 15, y + height / 3, 10, height / 3);
         }
         
-        if (Math.random() > 0.5) {
+        if (random() > 0.5) {
             ctx.fillRect(x + 5, y + height / 2, 10, height / 4);
         }
     }
-} 
+}

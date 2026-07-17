@@ -1,7 +1,7 @@
 {
   "name": "tanktank",
   "version": "1.0.0",
-  "description": "Um jogo de RPG simples desenvolvido com HTML5, JavaScript e CSS, utilizando Canvas para renderização dos elementos gráficos.",
+  "description": "Jogo de ação e exploração com tanques, mundo em telas e combate renderizado em Canvas.",
   "main": "index.js",
   "scripts": {
     "dev": "vite",

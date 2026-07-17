@@ -75,33 +75,38 @@ export const CONFIG = {
                 
                 // Aplica as configurações do jogador
                 if (config.player) {
-                    this.PLAYER.MAX_HEALTH = config.player.maxHealth || this.PLAYER.MAX_HEALTH;
-                    this.PLAYER.SPEED = config.player.speed || this.PLAYER.SPEED;
-                    this.PLAYER.XP_TO_NEXT_LEVEL = config.player.xpToNextLevel || this.PLAYER.XP_TO_NEXT_LEVEL;
-                    this.PLAYER.INVULNERABLE_DURATION = config.player.invulnerableDuration || this.PLAYER.INVULNERABLE_DURATION;
+                    this.PLAYER.MAX_HEALTH = config.player.maxHealth ?? this.PLAYER.MAX_HEALTH;
+                    this.PLAYER.SPEED = config.player.speed ?? this.PLAYER.SPEED;
+                    this.PLAYER.XP_TO_NEXT_LEVEL = config.player.xpToNextLevel ?? this.PLAYER.XP_TO_NEXT_LEVEL;
+                    this.PLAYER.INVULNERABLE_DURATION = config.player.invulnerableDuration ?? this.PLAYER.INVULNERABLE_DURATION;
                     
                     // Configurações dos poderes
-                    this.PLAYER.FIREBALL_MAX_COOLDOWN = config.player.fireballMaxCooldown || this.PLAYER.FIREBALL_MAX_COOLDOWN;
-                    this.PLAYER.FIREBALL_DAMAGE = config.player.fireballDamage || this.PLAYER.FIREBALL_DAMAGE;
-                    this.PLAYER.FIREBALL_SIZE = config.player.fireballSize || this.PLAYER.FIREBALL_SIZE;
+                    this.PLAYER.FIREBALL_MAX_COOLDOWN = config.player.fireballMaxCooldown ?? this.PLAYER.FIREBALL_MAX_COOLDOWN;
+                    this.PLAYER.FIREBALL_DAMAGE = config.player.fireballDamage ?? this.PLAYER.FIREBALL_DAMAGE;
+                    this.PLAYER.FIREBALL_SIZE = config.player.fireballSize ?? this.PLAYER.FIREBALL_SIZE;
+
+                    this.PLAYER.ICE_MAX_COOLDOWN = config.player.iceMaxCooldown ?? this.PLAYER.ICE_MAX_COOLDOWN;
+                    this.PLAYER.ICE_DAMAGE = config.player.iceDamage ?? this.PLAYER.ICE_DAMAGE;
+                    this.PLAYER.ICE_SIZE = config.player.iceSize ?? this.PLAYER.ICE_SIZE;
+                    this.PLAYER.ICE_DURATION = config.player.iceDuration ?? this.PLAYER.ICE_DURATION;
                     
-                    this.PLAYER.AOE_MAX_COOLDOWN = config.player.aoeMaxCooldown || this.PLAYER.AOE_MAX_COOLDOWN;
-                    this.PLAYER.AOE_DAMAGE = config.player.aoeDamage || this.PLAYER.AOE_DAMAGE;
-                    this.PLAYER.AOE_SIZE = config.player.aoeSize || this.PLAYER.AOE_SIZE;
+                    this.PLAYER.AOE_MAX_COOLDOWN = config.player.aoeMaxCooldown ?? this.PLAYER.AOE_MAX_COOLDOWN;
+                    this.PLAYER.AOE_DAMAGE = config.player.aoeDamage ?? this.PLAYER.AOE_DAMAGE;
+                    this.PLAYER.AOE_SIZE = config.player.aoeSize ?? this.PLAYER.AOE_SIZE;
                     
-                    this.PLAYER.POISON_MAX_COOLDOWN = config.player.poisonMaxCooldown || this.PLAYER.POISON_MAX_COOLDOWN;
-                    this.PLAYER.POISON_DAMAGE = config.player.poisonDamage || this.PLAYER.POISON_DAMAGE;
-                    this.PLAYER.POISON_SIZE = config.player.poisonSize || this.PLAYER.POISON_SIZE;
+                    this.PLAYER.POISON_MAX_COOLDOWN = config.player.poisonMaxCooldown ?? this.PLAYER.POISON_MAX_COOLDOWN;
+                    this.PLAYER.POISON_DAMAGE = config.player.poisonDamage ?? this.PLAYER.POISON_DAMAGE;
+                    this.PLAYER.POISON_SIZE = config.player.poisonSize ?? this.PLAYER.POISON_SIZE;
                     
-                    this.PLAYER.ARROW_MAX_COOLDOWN = config.player.arrowMaxCooldown || this.PLAYER.ARROW_MAX_COOLDOWN;
-                    this.PLAYER.ARROW_DAMAGE = config.player.arrowDamage || this.PLAYER.ARROW_DAMAGE;
-                    this.PLAYER.ARROW_SIZE = config.player.arrowSize || this.PLAYER.ARROW_SIZE;
+                    this.PLAYER.ARROW_MAX_COOLDOWN = config.player.arrowMaxCooldown ?? this.PLAYER.ARROW_MAX_COOLDOWN;
+                    this.PLAYER.ARROW_DAMAGE = config.player.arrowDamage ?? this.PLAYER.ARROW_DAMAGE;
+                    this.PLAYER.ARROW_SIZE = config.player.arrowSize ?? this.PLAYER.ARROW_SIZE;
                 }
                 
                 // Aplica as configurações do jogo
                 if (config.game) {
-                    this.CHEST.SPAWN_CHANCE = config.game.chestSpawnChance || this.CHEST.SPAWN_CHANCE;
-                    this.CHEST.MIN_SPAWN_INTERVAL = config.game.minChestSpawnInterval || this.CHEST.MIN_SPAWN_INTERVAL;
+                    this.CHEST.SPAWN_CHANCE = config.game.chestSpawnChance ?? this.CHEST.SPAWN_CHANCE;
+                    this.CHEST.MIN_SPAWN_INTERVAL = config.game.minChestSpawnInterval ?? this.CHEST.MIN_SPAWN_INTERVAL;
                 }
                 
                 console.log('Configurações carregadas com sucesso do localStorage');
@@ -121,4 +126,4 @@ export const CONFIG = {
 };
 
 // Carrega as configurações do localStorage quando o arquivo é importado
-CONFIG.loadFromLocalStorage(); 
+CONFIG.loadFromLocalStorage();
